@@ -1,0 +1,16 @@
+.vs
+*.exe
+*.ilk
+*.pdb
+*.obj
+*.log
+*.pch
+*.idb
+*.tlog
+*.lastbuildstate
+*.suo
+*.db
+Client/x64/Debug
+Server/x64/Debug
+Server/x64/Release
+lib
