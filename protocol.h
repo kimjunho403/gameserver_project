@@ -4,7 +4,7 @@ constexpr int NAME_SIZE = 20;
 
 constexpr int W_WIDTH = 2000;
 constexpr int W_HEIGHT = 2000;
-constexpr int VIEW_RANGE = 4;
+constexpr int VIEW_RANGE = 5;
 //2d게임은 시야를 사각형으로
 //3d게임은 원으로 
 //카메라의 방향을 자유롭게 돌릴수있는지 

@@ -18,4 +18,3 @@ using namespace chrono;
 constexpr int MAX_USER = 10000;
 constexpr int MAX_NPC = 20000;
 
-

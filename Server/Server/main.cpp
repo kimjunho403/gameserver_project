@@ -9,11 +9,18 @@ SOCKET g_s_SOCKET;
 
 array < SESSION*, MAX_USER + MAX_NPC > clients; //오브젝트 풀
 unordered_set<int> login_index;
+bool can_see(int c1, int c2)
+{
+	if (abs(clients[c1]->_x - clients[c2]->_x) > VIEW_RANGE) return false;
+	return (abs(clients[c1]->_y - clients[c2]->_y) <= VIEW_RANGE);
+
+}
+
 int get_new_client_id()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 
-		/*lock_guard<mutex>ll( clients[i]->_s_lock );*/
+		//lock_guard <mutex> ll{ clients[i]->_s_lock };
 		if (clients[i]== nullptr)
 		{
 			clients[i] =new Player;
@@ -26,10 +33,10 @@ int get_new_client_id()
 void disconnect(int c_id)
 {
 	for (auto& index : login_index) {
-		//{
-		//	lock_guard<mutex> ll(pl->_s_lock);
+		{
+			lock_guard<mutex> ll((clients[index]->_s_lock));
 			if (ST_INGAME != clients[index]->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
-	//	}
+		}
 		if (clients[index]->_id == c_id) continue;
 		SC_REMOVE_PLAYER_PACKET p;
 		p.id = c_id;
@@ -39,7 +46,7 @@ void disconnect(int c_id)
 	}
 	closesocket(clients[c_id]->_socket);
 
-	//lock_guard<mutex> ll(clients[c_id]->_s_lock);
+	lock_guard<mutex> ll(clients[c_id]->_s_lock);
 	clients[c_id]->_state = ST_FREE;
 	login_index.erase(c_id);
 }
@@ -50,45 +57,26 @@ void process_packet(int c_id, char* packet)
 	case CS_LOGIN: {
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 		strcpy_s(clients[c_id/*얘가 로그인한걸 알려줌*/]->_name, p->name);
-		clients[c_id]->send_login_info_packet();
 		{
 			lock_guard<mutex> ll(clients[c_id]->_s_lock);
 			clients[c_id]->_state = ST_INGAME;
-
 			login_index.insert(c_id);
 		}
-		for (auto& index : login_index) {
-			//{
-			//	lock_guard<mutex> ll(pl->_s_lock);
-			//	if (ST_INGAME != pl->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
-			//}
+		clients[c_id]->send_login_info_packet(); //나한테 
+
+		for (auto& index : login_index) {//내 정보를 다른 클라한테 정보 넘기자
+			{
+				lock_guard<mutex> ll(clients[index]->_s_lock);
+				if (ST_INGAME != clients[index]->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
+			}
 		//	if (pl == nullptr) continue;
 			if (clients[index]->_id == c_id) continue;//내 자신에게 보낼필요는 없음 
-			SC_ADD_PLAYER_PACKET add_packet;
-			add_packet.id = c_id;
-			strcpy_s(add_packet.name, clients[index]->_name);
-			add_packet.size = sizeof(add_packet);
-			add_packet.type = SC_ADD_PLAYER;
-			add_packet.x = clients[c_id]->_x;
-			add_packet.y = clients[c_id]->_y;
-			clients[index]->do_send(&add_packet);
+			if (false == can_see(c_id, clients[index]->_id)) continue;
+			clients[c_id]->add_session_packet(index, clients[index]);
+			clients[index]->add_session_packet(c_id, clients[c_id]);
+
 		}
-		for (auto& index : login_index) {
-			//{
-			//	lock_guard<mutex> ll(pl->_s_lock);
-			//	if (ST_INGAME != pl->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
-			//}
-			//if (pl == nullptr) continue;
-			if (clients[index]->_id == c_id) continue;
-			SC_ADD_PLAYER_PACKET add_packet;
-			add_packet.id = clients[index]->_id;
-			strcpy_s(add_packet.name, clients[index]->_name);
-			add_packet.size = sizeof(add_packet);
-			add_packet.type = SC_ADD_PLAYER;
-			add_packet.x = clients[index]->_x;
-			add_packet.y = clients[index]->_y;
-			clients[c_id]->do_send(&add_packet);
-		}
+
 		break;
 	}
 	case CS_MOVE: {
@@ -105,17 +93,31 @@ void process_packet(int c_id, char* packet)
 		clients[c_id]->_x = x;
 		clients[c_id]->_y = y;
 
-
-
+		unordered_set<int> near_list;
+		clients[c_id]->_vl.lock();
+		unordered_set<int> old_vlist = clients[c_id]->_view_list;
+		clients[c_id]->_vl.unlock();
 		for (auto& index : login_index) {
-			/*{
+			{
 					lock_guard<mutex> ll (clients[index]->_s_lock);
 				if (ST_INGAME != clients[index]->_state) continue;
-			}*/
-			clients[index]->send_move_packet(c_id,clients[c_id], clients[c_id]->last_movetime);
+			}
+			if (clients[index]->_id == c_id) continue;
+			if (can_see(c_id, clients[index]->_id)) near_list.insert(clients[index]->_id);
+			
+		}
+		clients[c_id]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
+
+		//다른애들한테 내 정보 전달 
+
+		//viewlist에서 사라졌다면 remove 패킷 전달 
+		for (auto& index : old_vlist) {
+			if (0 == near_list.count(index)) {
+				clients[c_id]->send_remove_session_packet(index);
+				clients[index]->send_remove_session_packet(c_id);
 		}
 
-
+		}
 		break;
 	}
 	}
@@ -152,14 +154,14 @@ void worker_thread(HANDLE h_iocp) {
 		case OP_ACCEPT: {
 			int client_id = get_new_client_id();//새로온 클라 아이디 받음 
 			if (client_id != -1) {//-1이면 더이상 받을수 없음 
-				/*{
+				{
 					lock_guard<mutex> ll(clients[client_id]->_s_lock);
 					clients[client_id]->_state = ST_ALLOC;
-				}*/
+				}
 				clients[client_id]->_x = rand() % 400;
 				clients[client_id]->_y = rand() % 400;
 				clients[client_id]->_id = client_id;
-				clients[client_id]->_name[0] = 0;
+				strcpy_s(clients[client_id]->_name, "TEST");
 				clients[client_id]->_prev_remain = 0;
 				clients[client_id]->_socket = g_c_SOCKET;
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_SOCKET), h_iocp, client_id, 0);

@@ -42,3 +42,35 @@ void Player::send_login_info_packet()
 	p.y = _y;
 	do_send(&p);
 }
+
+void Player::add_session_packet(int c_id, SESSION* clients)
+{
+	SC_ADD_PLAYER_PACKET add_packet;
+	add_packet.id = c_id;
+	strcpy_s(add_packet.name, "test");
+	add_packet.size = sizeof(add_packet);
+	add_packet.type = SC_ADD_PLAYER;
+	add_packet.x = clients->_x;
+	add_packet.y = clients->_y;
+	_vl.lock();
+	_view_list.insert(c_id);
+	_vl.unlock();
+	do_send(&add_packet);
+}
+
+void Player::send_remove_session_packet(int c_id)
+{
+	_vl.lock();
+	if (_view_list.count(c_id))
+		_view_list.erase(c_id);
+	else {
+		_vl.unlock();
+		return;
+	}
+	_vl.unlock();
+	SC_REMOVE_PLAYER_PACKET p;
+	p.id = c_id;
+	p.size = sizeof(p);
+	p.type = SC_REMOVE_PLAYER;
+	do_send(&p);
+}
