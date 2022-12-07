@@ -20,7 +20,7 @@ void Player::do_send(void* packet)
 	WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
 }
 
-void Player::send_move_packet(int c_id, SESSION* clients)
+void Player::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
 {
 	SC_MOVE_PLAYER_PACKET p;
 	p.id = c_id;
@@ -28,7 +28,7 @@ void Player::send_move_packet(int c_id, SESSION* clients)
 	p.type = SC_MOVE_PLAYER;
 	p.x = clients->_x;
 	p.y = clients->_y;
-	//p.move_time = move_time;
+	p.move_time = move_time;
 	do_send(&p);
 }
 

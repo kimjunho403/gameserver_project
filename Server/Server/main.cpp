@@ -93,6 +93,7 @@ void process_packet(int c_id, char* packet)
 	}
 	case CS_MOVE: {
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
+		clients[c_id]->last_movetime = p->move_time;
 		short x = clients[c_id]->_x;
 		short y = clients[c_id]->_y;
 		switch (p->direction) {
@@ -111,7 +112,7 @@ void process_packet(int c_id, char* packet)
 					lock_guard<mutex> ll (clients[index]->_s_lock);
 				if (ST_INGAME != clients[index]->_state) continue;
 			}*/
-			clients[index]->send_move_packet(c_id,clients[c_id]);
+			clients[index]->send_move_packet(c_id,clients[c_id], clients[c_id]->last_movetime);
 		}
 
 

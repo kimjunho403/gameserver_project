@@ -8,6 +8,7 @@ protected:
 	OVER_EXP _recv_over;
 
 public:
+	
 	int _id;
 	mutex _s_lock;
 	S_STATE _state;
@@ -15,12 +16,12 @@ public:
 	short _x, _y;
 	char _name[NAME_SIZE];
 	int _prev_remain; //패킷 재조립하기 위한 변수 이전 패킷
-
+	unsigned last_movetime;
 public:
 	SESSION();
 	virtual ~SESSION();
 	virtual  void do_recv() = 0;
 	virtual void do_send(void* packet) = 0;
-	virtual void send_move_packet(int c_id,SESSION* clients) = 0;
+	virtual void send_move_packet(int c_id,SESSION* clients, unsigned move_time) = 0;
 	virtual void send_login_info_packet() = 0;
 };
