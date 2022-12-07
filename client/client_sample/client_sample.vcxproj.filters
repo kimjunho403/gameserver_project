@@ -277,6 +277,9 @@
     <ClInclude Include="include\SFML\Window\WindowStyle.hpp">
       <Filter>SFML\include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\protocol.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="include\SFML\Graphics\Glsl.inl">

@@ -1,6 +1,7 @@
 constexpr int PORT_NUM = 4000;
 constexpr int BUF_SIZE = 200; 
 constexpr int NAME_SIZE = 20;
+constexpr int CHAT_SIZE = 100;
 
 constexpr int W_WIDTH = 2000;
 constexpr int W_HEIGHT = 2000;
@@ -17,7 +18,7 @@ constexpr char SC_LOGIN_INFO = 2;
 constexpr char SC_ADD_PLAYER = 3;
 constexpr char SC_REMOVE_PLAYER = 4;
 constexpr char SC_MOVE_PLAYER = 5;
-
+constexpr char SC_CHAT = 6;
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
 	unsigned char size;
@@ -59,6 +60,13 @@ struct SC_MOVE_PLAYER_PACKET {
 	short	id;
 	short	x, y;
 	unsigned move_time;
+};
+
+struct SC_CHAT_PACKET {
+	unsigned char size;
+	char	type;
+	int		id;
+	char	mess[CHAT_SIZE];
 };
 
 #pragma pack (pop)

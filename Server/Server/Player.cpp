@@ -47,7 +47,7 @@ void Player::add_session_packet(int c_id, SESSION* clients)
 {
 	SC_ADD_PLAYER_PACKET add_packet;
 	add_packet.id = c_id;
-	strcpy_s(add_packet.name, "test");
+	strcpy_s(add_packet.name, clients->_name);
 	add_packet.size = sizeof(add_packet);
 	add_packet.type = SC_ADD_PLAYER;
 	add_packet.x = clients->_x;
