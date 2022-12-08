@@ -2,17 +2,34 @@
 #include "Over_exp.h"
 #include "Session.h"
 #include "Player.h"
+#include "Obstacle.h"
+#include <random>
+
+
+
 OVER_EXP g_a_over;//accept용 오버랩드 구조체 얘는 data rece가 아님 
 //동시에 2개의 오버랩드가 완료될리가 없음 
 SOCKET g_c_SOCKET;
 SOCKET g_s_SOCKET;
 
 array < SESSION*, MAX_USER + MAX_NPC > clients; //오브젝트 풀
+array < Obstacle, MAX_OBSTACLE > obsatcles;
 unordered_set<int> login_index;
+
+void init_obstacle() {
+	int i = 0;
+	for (auto& _ob : obsatcles) {
+		_ob._id = i;
+		_ob._x = rand() % 2000;
+		_ob._y = rand() % 2000;
+		i++;
+		
+	}
+}
 bool can_see(int c1, int c2)
 {
 	if (abs(clients[c1]->_x - clients[c2]->_x) > VIEW_RANGE) return false;
-	return (abs(clients[c1]->_y - clients[c2]->_y) <= VIEW_RANGE);
+	return abs(clients[c1]->_y - clients[c2]->_y) <= VIEW_RANGE;
 
 }
 
@@ -59,6 +76,8 @@ void process_packet(int c_id, char* packet)
 		strcpy_s(clients[c_id/*얘가 로그인한걸 알려줌*/]->_name, p->name);
 		{
 			lock_guard<mutex> ll(clients[c_id]->_s_lock);
+			clients[c_id]->_x = 1000;
+			clients[c_id]->_y = 1000;
 			clients[c_id]->_state = ST_INGAME;
 			login_index.insert(c_id);
 		}
@@ -71,12 +90,15 @@ void process_packet(int c_id, char* packet)
 			}
 		//	if (pl == nullptr) continue;
 			if (clients[index]->_id == c_id) continue;//내 자신에게 보낼필요는 없음 
-			if (false == can_see(c_id, clients[index]->_id)) continue;
+			if (false == can_see(c_id, clients[index]->_id)) continue;			
+			if(clients[index]->_id<MAX_USER) clients[index]->add_session_packet(c_id, clients[c_id]);
 			clients[c_id]->add_session_packet(index, clients[index]);
-			clients[index]->add_session_packet(c_id, clients[c_id]);
-
 		}
-
+		//장애물 위치 
+		for (auto& ob : obsatcles) {
+			static_cast<Player*>(clients[c_id])->send_obstacle_pos_packet(&ob);
+		}
+		
 		break;
 	}
 	case CS_MOVE: {
@@ -98,10 +120,7 @@ void process_packet(int c_id, char* packet)
 		unordered_set<int> old_vlist = clients[c_id]->_view_list;
 		clients[c_id]->_vl.unlock();
 		for (auto& index : login_index) {
-			{
-					lock_guard<mutex> ll (clients[index]->_s_lock);
-				if (ST_INGAME != clients[index]->_state) continue;
-			}
+			if (ST_INGAME != clients[index]->_state) continue;
 			if (clients[index]->_id == c_id) continue;
 			if (can_see(c_id, clients[index]->_id)) near_list.insert(clients[index]->_id);
 			
@@ -109,7 +128,24 @@ void process_packet(int c_id, char* packet)
 		clients[c_id]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
 
 		//다른애들한테 내 정보 전달 
+		for (auto& near_pl : near_list) {
+			auto& cpl = clients[near_pl];
+			if (clients[near_pl]->_id < MAX_USER) {
+				cpl->_vl.lock();
+				if (clients[near_pl]->_view_list.count(c_id)) {
+					cpl->_vl.unlock();
+					clients[near_pl]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
+				}
+				else
+				{
+					cpl->_vl.unlock();
+					clients[near_pl]->add_session_packet(c_id, clients[c_id]);
+				}
 
+				if (old_vlist.count(near_pl) == 0)
+					clients[c_id]->add_session_packet(near_pl, clients[near_pl]);
+			}
+		}
 		//viewlist에서 사라졌다면 remove 패킷 전달 
 		for (auto& index : old_vlist) {
 			if (0 == near_list.count(index)) {
@@ -158,8 +194,9 @@ void worker_thread(HANDLE h_iocp) {
 					lock_guard<mutex> ll(clients[client_id]->_s_lock);
 					clients[client_id]->_state = ST_ALLOC;
 				}
-				clients[client_id]->_x = rand() % 400;
-				clients[client_id]->_y = rand() % 400;
+				
+				clients[client_id]->_x = 1000;
+				clients[client_id]->_y = 1000;
 				clients[client_id]->_id = client_id;
 				strcpy_s(clients[client_id]->_name, "TEST");
 				clients[client_id]->_prev_remain = 0;
@@ -206,6 +243,9 @@ void worker_thread(HANDLE h_iocp) {
 
 int main()
 {
+	srand(time(NULL));
+	init_obstacle();
+
 	HANDLE h_iocp;
 
 	WSADATA WSAData;

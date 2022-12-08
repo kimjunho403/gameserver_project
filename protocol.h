@@ -19,6 +19,7 @@ constexpr char SC_ADD_PLAYER = 3;
 constexpr char SC_REMOVE_PLAYER = 4;
 constexpr char SC_MOVE_PLAYER = 5;
 constexpr char SC_CHAT = 6;
+constexpr char SC_OBSTACLE = 7;
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
 	unsigned char size;
@@ -67,6 +68,13 @@ struct SC_CHAT_PACKET {
 	char	type;
 	int		id;
 	char	mess[CHAT_SIZE];
+};
+
+struct SC_OBSTACLE_PACKET {
+	unsigned char size;
+	char	type;
+	int		id;
+	short	x, y;
 };
 
 #pragma pack (pop)

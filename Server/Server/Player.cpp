@@ -65,12 +65,25 @@ void Player::send_remove_session_packet(int c_id)
 		_view_list.erase(c_id);
 	else {
 		_vl.unlock();
+		
 		return;
 	}
+	cout << "dddfs" << endl;
 	_vl.unlock();
 	SC_REMOVE_PLAYER_PACKET p;
 	p.id = c_id;
 	p.size = sizeof(p);
 	p.type = SC_REMOVE_PLAYER;
+	do_send(&p);
+}
+
+void Player::send_obstacle_pos_packet(Obstacle* _obstacle)
+{
+	SC_OBSTACLE_PACKET p;
+	p.id = _obstacle->_id;
+	p.size = sizeof(SC_OBSTACLE_PACKET);
+	p.type = SC_OBSTACLE;
+	p.x = _obstacle->_x;
+	p.y = _obstacle->_y;
 	do_send(&p);
 }

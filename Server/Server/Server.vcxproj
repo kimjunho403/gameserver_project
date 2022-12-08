@@ -128,6 +128,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Obstacle.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Over_exp.cpp" />
     <ClCompile Include="Session.cpp" />
@@ -135,6 +136,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\protocol.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="Obstacle.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Over_exp.h" />

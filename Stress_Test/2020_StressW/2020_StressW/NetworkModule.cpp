@@ -162,6 +162,7 @@ void ProcessPacket(int ci, unsigned char packet[])
 					   break;
 	case SC_ADD_PLAYER: break;//무시
 	case SC_REMOVE_PLAYER: break;//무시
+	case SC_OBSTACLE: break;
 	case SC_LOGIN_INFO:
 	{
 		g_clients[ci].connected = true;

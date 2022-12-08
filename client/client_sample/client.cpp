@@ -31,8 +31,8 @@ constexpr auto SCREEN_HEIGHT = 16;
 constexpr auto TILE_WIDTH = 65;
 constexpr auto WINDOW_WIDTH = SCREEN_WIDTH*TILE_WIDTH;   // size of window
 constexpr auto WINDOW_HEIGHT =SCREEN_WIDTH*TILE_WIDTH;
-constexpr auto MAX_USER = 5000;
-constexpr auto MAX_TREE = 1500;
+constexpr auto MAX_USER = 10000;
+constexpr auto MAX_TREE = 2000;
 
 int g_left_x;
 int g_top_y;
@@ -135,7 +135,6 @@ void client_initialize()
 	board = new sf::Texture;
 	pieces = new sf::Texture;
 	plant = new sf::Texture;
-
 	board->loadFromFile("chessmap.bmp");
 	pieces->loadFromFile("chess2.png");
 	plant->loadFromFile("plant.png");
@@ -145,28 +144,14 @@ void client_initialize()
 	}
 	white_tile = OBJECT{ *board, 5, 5, TILE_WIDTH, TILE_WIDTH };
 	black_tile = OBJECT{ *board, 69, 5, TILE_WIDTH, TILE_WIDTH };
-	
 	avatar = OBJECT{ *pieces, 128, 0, 64, 64 };
 	avatar.move(4, 4);
 
-	for (size_t i = 0; i < 30; i++) {
-		for (size_t j = 0; j < 30; j++) {
-			trees[i] = OBJECT{ *plant, 0, 0, 64, 64 };
-			trees[i].show();
-			trees[i].m_y = i* rand()%10;
-			trees[i].m_x = j* rand() % 10;
-			
-		}
-	}
+
 	for (auto& tr : trees) {
 		tr = OBJECT{ *plant, 0, 0, 64, 64 };
-		tr.show();
-		tr.m_y = rand() % 400;
-		tr.m_x =  rand() % 400;
 	}
-	for (auto& pl : players) {
-		pl.second = OBJECT{ *pieces, 64, 0, 64, 64 };
-	}
+
 }
 
 void client_finish()
@@ -185,6 +170,7 @@ void ProcessPacket(char* ptr)
 	{
 		SC_LOGIN_INFO_PACKET * packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
 		g_myid = packet->id;
+		avatar.id = g_myid;
 		avatar.move(packet->x, packet->y);
 		g_left_x = packet->x - 7;
 		g_top_y = packet->y - 7;
@@ -203,8 +189,9 @@ void ProcessPacket(char* ptr)
 			avatar.show();
 		}
 		else if (id < MAX_USER) {
-			//players[id] = OBJECT{ *pieces, 0, 0, 64, 64 };
+			players[id] = OBJECT{ *pieces, 0, 0, 64, 64 };
 			players[id].id = id;
+			cout << my_packet->x << "  " << my_packet->y << endl;
 			players[id].move(my_packet->x, my_packet->y);
 			players[id].set_name(my_packet->name);
 			players[id].show();
@@ -220,19 +207,18 @@ void ProcessPacket(char* ptr)
 	}
 	case SC_MOVE_PLAYER:
 	{
+		cout << "dd" << endl;
 		SC_MOVE_PLAYER_PACKET* my_packet = reinterpret_cast<SC_MOVE_PLAYER_PACKET*>(ptr);
 		int other_id = my_packet->id;
 		if (other_id == g_myid) {
+			cout << my_packet->x << "    " << my_packet->y << endl;
 			avatar.move(my_packet->x, my_packet->y);
 			g_left_x = my_packet->x - 7;
 			g_top_y = my_packet->y - 7;
 		}
-		else if (other_id < MAX_USER) {
-			players[other_id].move(my_packet->x, my_packet->y);
-		}
 		else {
-			//npc[other_id - NPC_START].x = my_packet->x;
-			//npc[other_id - NPC_START].y = my_packet->y;
+			cout << my_packet->x <<"    " << my_packet->y << endl;
+			players[other_id].move(my_packet->x, my_packet->y);
 		}
 		break;
 	}
@@ -244,11 +230,8 @@ void ProcessPacket(char* ptr)
 		if (other_id == g_myid) {
 			avatar.hide();
 		}
-		else if (other_id < MAX_USER) {
-			players[other_id].hide();
-		}
 		else {
-			//		npc[other_id - NPC_START].attr &= ~BOB_ATTR_VISIBLE;
+			players.erase(other_id);
 		}
 		break;
 	}
@@ -263,6 +246,15 @@ void ProcessPacket(char* ptr)
 			players[other_id].set_chat(my_packet->mess);
 		}
 
+		break;
+	}
+	case SC_OBSTACLE:
+	{
+		SC_OBSTACLE_PACKET* my_packet = reinterpret_cast<SC_OBSTACLE_PACKET*>(ptr);
+		
+		trees[my_packet->id].m_x = my_packet->x;
+		trees[my_packet->id].m_y = my_packet->y;
+		trees[my_packet->id].show();
 		break;
 	}
 	default:
@@ -335,7 +327,10 @@ void client_main()
 	}
 
 	avatar.draw();
-	for (auto& pl : players) pl.second.draw();
+	for (auto& pl : players) {
+		//cout << pl.second.m_x << "  " << pl.second.m_y << endl;
+		pl.second.draw();
+	}
 	sf::Text text;
 	text.setFont(g_font);
 	char buf[100];

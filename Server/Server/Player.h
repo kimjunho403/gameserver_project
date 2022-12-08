@@ -1,6 +1,6 @@
 #pragma once
 #include "Session.h"
-
+#include "Obstacle.h"
 class Player : public SESSION
 {
 	
@@ -12,7 +12,7 @@ public:
 	virtual void send_login_info_packet() override;
 	virtual void add_session_packet(int c_id, SESSION* clients) override;
 	virtual void send_remove_session_packet(int c_id) override;
-
+	void send_obstacle_pos_packet( Obstacle* _obstacle);
 };
 
 
