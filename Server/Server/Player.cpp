@@ -30,6 +30,7 @@ void Player::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
 	p.type = SC_MOVE_OBJECT;
 	p.x = clients->_x;
 	p.y = clients->_y;
+	p.dir = clients->dir;
 	p.move_time = move_time;
 	do_send(&p);
 }
@@ -42,6 +43,7 @@ void Player::send_login_info_packet()
 	p.type = SC_LOGIN_INFO;
 	p.x = _x;
 	p.y = _y;
+	strcpy_s(p.name,_name);
 	do_send(&p);
 }
 

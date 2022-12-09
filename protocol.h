@@ -2,13 +2,17 @@ constexpr int PORT_NUM = 4000;
 constexpr int BUF_SIZE = 200;
 constexpr int NAME_SIZE = 20;
 constexpr int CHAT_SIZE = 100;
-constexpr int VIEW_RANGE = 5;
+constexpr int VIEW_RANGE = 15;
 constexpr int MAX_USER = 10000;
 constexpr int MAX_NPC = 200000;
 constexpr int MAX_OBSTACLE = 10000;
 constexpr int W_WIDTH = 2000;
 constexpr int W_HEIGHT = 2000;
 
+constexpr int DOWN = 0;
+constexpr int UP = 1;
+constexpr int LEFT = 2;
+constexpr int RIGHT = 3;
 // Packet ID
 constexpr char CS_LOGIN = 0;
 constexpr char CS_MOVE = 1;
@@ -59,12 +63,14 @@ struct CS_LOGOUT_PACKET {
 struct SC_LOGIN_INFO_PACKET {
 	unsigned char size;
 	char	type;
+	short	x, y;
+	char	name[NAME_SIZE];
 	int		id;
 	int		hp;
 	int		max_hp;
 	int		exp;
 	int		level;
-	short	x, y;
+	
 };
 
 struct SC_ADD_OBJECT_PACKET {
@@ -86,6 +92,7 @@ struct SC_MOVE_OBJECT_PACKET {
 	char	type;
 	int		id;
 	short	x, y;
+	short dir;
 	unsigned int move_time;
 };
 

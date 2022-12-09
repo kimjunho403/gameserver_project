@@ -26,6 +26,40 @@ void init_obstacle() {
 		
 	}
 }
+bool is_collision(SESSION* player, short dir) {
+	switch (dir)
+	{
+	case LEFT:
+		for (auto& _ob : obsatcles) {
+			if (_ob._x == player->_x - 1 && _ob._y == player->_y) {
+				return true;
+			}
+		}
+			break;
+	case RIGHT:
+		for (auto& _ob : obsatcles) {
+			if (_ob._x == player->_x + 1 && _ob._y == player->_y) {
+				return true;
+			}
+		}
+			break;
+	case UP:
+		for (auto& _ob : obsatcles) {
+			if (_ob._x == player->_x && _ob._y == player->_y + 1) {
+				return true;
+			}
+		}
+		break;
+	case DOWN:
+		for (auto& _ob : obsatcles) {
+			if (_ob._x == player->_x && _ob._y == player->_y - 1) {
+				return true;
+			}
+		}
+		break;
+	}
+	return false;
+}
 bool can_see(int c1, int c2)
 {
 	if (abs(clients[c1]->_x - clients[c2]->_x) > VIEW_RANGE) return false;
@@ -116,12 +150,17 @@ void process_packet(int c_id, char* packet)
 		clients[c_id]->last_movetime = p->move_time;
 		short x = clients[c_id]->_x;
 		short y = clients[c_id]->_y;
-		switch (p->direction) {
-		case 0: if (y > 0) y--;     break;
-		case 1: if (y < W_HEIGHT - 1) y++; break;
-		case 2: if (x > 0) x--; break;
-		case 3: if (x < W_WIDTH - 1) x++; break;
-		}
+		if (!is_collision(clients[c_id], p->direction)) {
+
+			switch (p->direction) {
+			case DOWN: if (y > 0) y--; clients[c_id]->dir = DOWN;  break;
+			case UP: if (y < W_HEIGHT - 1) y++; clients[c_id]->dir = UP; break;
+			case LEFT: if (x > 0) x--; clients[c_id]->dir = LEFT; break;
+			case RIGHT: if (x < W_WIDTH - 1) x++; clients[c_id]->dir = RIGHT; break;
+			}
+
+			}
+
 		clients[c_id]->_x = x;
 		clients[c_id]->_y = y;
 
@@ -211,10 +250,7 @@ void worker_thread(HANDLE h_iocp) {
 					clients[client_id]->_state = ST_ALLOC;
 				}
 				
-				clients[client_id]->_x = 1000;
-				clients[client_id]->_y = 1000;
 				clients[client_id]->_id = client_id;
-				strcpy_s(clients[client_id]->_name, "TEST");
 				clients[client_id]->_prev_remain = 0;
 				clients[client_id]->_socket = g_c_SOCKET;
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_SOCKET), h_iocp, client_id, 0);

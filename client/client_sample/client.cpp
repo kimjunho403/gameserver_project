@@ -50,13 +50,14 @@ private:
 	sf::IntRect rectSprite;
 	chrono::system_clock::time_point m_mess_end_time;
 public:
+	int rectSprite_left;
 	int id;
 	int m_x, m_y;
 	char name[NAME_SIZE];
 	int _hp, _max_hp;
 	int exp, _max_exp;
 	int level;
-	int dir;
+	short dir;
 	int power;
 	OBJECT(sf::Texture& t, int x, int y, int x2, int y2) {
 		m_showing = false;
@@ -93,6 +94,27 @@ public:
 		m_x = x;
 		m_y = y;
 	}
+	
+	void set_rotate(int _dir) {
+		dir = _dir;
+		switch (dir)
+		{
+		case UP:
+			rectSprite.top = 15;
+			break;
+		case  LEFT:
+			rectSprite.top = 85;
+			break;
+		case RIGHT:
+			rectSprite.top = 155;
+			break;
+		case DOWN:
+			rectSprite.top = 225;
+			break;
+		}
+		
+	}
+
 	void draw() {
 		if (false == m_showing) return;
 		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
@@ -100,8 +122,8 @@ public:
 		m_sprite.setPosition(rx, ry);
 		if (clock.getElapsedTime().asSeconds() >0.3f)
 		{ 
-			if (rectSprite.left == 15 + 95 * 3)
-				rectSprite.left = 15;
+			if (rectSprite.left == 20 + 95 * 3)
+				rectSprite.left = 20;
 			else
 				rectSprite.left += 95;
 
@@ -175,7 +197,7 @@ void client_initialize()
 	}
 	white_tile = OBJECT{ *board, 4, 4, TILE_WIDTH, TILE_WIDTH };
 	black_tile = OBJECT{ *board, 70, 4, TILE_WIDTH, TILE_WIDTH };
-	avatar = OBJECT{ *pieces, 15,20, TILE_WIDTH, TILE_WIDTH+5 };
+	avatar = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH+5 };
 	
 	
 
@@ -202,9 +224,11 @@ void ProcessPacket(char* ptr)
 		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
 		g_myid = packet->id;
 		avatar.id = g_myid;
+		//cout << packet->name << endl;
 		avatar.move(packet->x, packet->y);
 		g_left_x = packet->x - SCREEN_WIDTH / 2;
 		g_top_y = packet->y - SCREEN_WIDTH / 2;
+		avatar.set_name(packet->name);
 		avatar.show();
 	}
 	break;
@@ -215,12 +239,13 @@ void ProcessPacket(char* ptr)
 
 		if (id == g_myid) {
 			avatar.move(my_packet->x, my_packet->y);
+			
 			g_left_x = my_packet->x - SCREEN_WIDTH / 2;
 			g_top_y = my_packet->y - SCREEN_WIDTH / 2;
 			avatar.show();
 		}
 		else if (id < MAX_USER) {
-			players[id] = OBJECT{ *pieces, 15,20, TILE_WIDTH, TILE_WIDTH + 5 };
+			players[id] = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 };
 			players[id].id = id;
 			players[id].move(my_packet->x, my_packet->y);
 			players[id].set_name(my_packet->name);
@@ -241,12 +266,13 @@ void ProcessPacket(char* ptr)
 		int other_id = my_packet->id;
 		if (other_id == g_myid) {
 			avatar.move(my_packet->x, my_packet->y);
+			avatar.set_rotate(my_packet->dir);
 			g_left_x = my_packet->x - SCREEN_WIDTH / 2;
 			g_top_y = my_packet->y - SCREEN_WIDTH / 2;
 		}
 		else {
-			cout << my_packet->x << "    " << my_packet->y << endl;
 			players[other_id].move(my_packet->x, my_packet->y);
+			players[other_id].set_rotate(my_packet->dir);
 		}
 		break;
 	}
@@ -413,6 +439,7 @@ int main()
 				switch (event.key.code) {
 				case sf::Keyboard::Left:
 					direction = 2;
+
 					break;
 				case sf::Keyboard::Right:
 					direction = 3;
