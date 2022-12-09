@@ -2,6 +2,8 @@
 #include "Player.h"
 #include "Over_exp.h"
 
+
+
 void Player::do_recv()
 {
 	DWORD recv_flag = 0;
@@ -22,10 +24,10 @@ void Player::do_send(void* packet)
 
 void Player::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
 {
-	SC_MOVE_PLAYER_PACKET p;
+	SC_MOVE_OBJECT_PACKET p;
 	p.id = c_id;
-	p.size = sizeof(SC_MOVE_PLAYER_PACKET);
-	p.type = SC_MOVE_PLAYER;
+	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
+	p.type = SC_MOVE_OBJECT;
 	p.x = clients->_x;
 	p.y = clients->_y;
 	p.move_time = move_time;
@@ -45,11 +47,11 @@ void Player::send_login_info_packet()
 
 void Player::add_session_packet(int c_id, SESSION* clients)
 {
-	SC_ADD_PLAYER_PACKET add_packet;
+	SC_ADD_OBJECT_PACKET add_packet;
 	add_packet.id = c_id;
 	strcpy_s(add_packet.name, clients->_name);
 	add_packet.size = sizeof(add_packet);
-	add_packet.type = SC_ADD_PLAYER;
+	add_packet.type = SC_ADD_OBJECT;
 	add_packet.x = clients->_x;
 	add_packet.y = clients->_y;
 	_vl.lock();
@@ -70,10 +72,10 @@ void Player::send_remove_session_packet(int c_id)
 	}
 	cout << "dddfs" << endl;
 	_vl.unlock();
-	SC_REMOVE_PLAYER_PACKET p;
+	SC_REMOVE_OBJECT_PACKET p;
 	p.id = c_id;
 	p.size = sizeof(p);
-	p.type = SC_REMOVE_PLAYER;
+	p.type = SC_REMOVE_OBJECT;
 	do_send(&p);
 }
 

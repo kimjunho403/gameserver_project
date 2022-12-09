@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include<mutex>
 #include<chrono>
+#include<string>
 #include "../../protocol.h"
 
 #pragma comment(lib, "WS2_32.lib")
@@ -15,6 +16,3 @@
 using namespace std;
 using namespace chrono;
 
-constexpr int MAX_USER = 10000;
-constexpr int MAX_NPC = 20000;
-constexpr int MAX_OBSTACLE = 2000;

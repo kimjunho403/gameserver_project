@@ -19,6 +19,14 @@ public:
 	unsigned last_movetime;
 	mutex _vl;
 	unordered_set <int> _view_list;
+
+public:
+	int _hp, _max_hp;
+	int exp, _max_exp;
+	short level;
+	short dir;
+	int power;
+
 public:
 	SESSION();
 	virtual ~SESSION();

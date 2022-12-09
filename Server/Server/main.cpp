@@ -3,18 +3,18 @@
 #include "Session.h"
 #include "Player.h"
 #include "Obstacle.h"
+#include "DB.h"
 #include <random>
-
-
 
 OVER_EXP g_a_over;//accept용 오버랩드 구조체 얘는 data rece가 아님 
 //동시에 2개의 오버랩드가 완료될리가 없음 
 SOCKET g_c_SOCKET;
-SOCKET g_s_SOCKET;
+SOCKET g_s_SOCKET; 
 
 array < SESSION*, MAX_USER + MAX_NPC > clients; //오브젝트 풀
 array < Obstacle, MAX_OBSTACLE > obsatcles;
 unordered_set<int> login_index;
+DB User_DB;
 
 void init_obstacle() {
 	int i = 0;
@@ -55,10 +55,10 @@ void disconnect(int c_id)
 			if (ST_INGAME != clients[index]->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
 		}
 		if (clients[index]->_id == c_id) continue;
-		SC_REMOVE_PLAYER_PACKET p;
+		SC_REMOVE_OBJECT_PACKET p;
 		p.id = c_id;
 		p.size = sizeof(p);
-		p.type = SC_REMOVE_PLAYER;
+		p.type = SC_REMOVE_OBJECT;
 		clients[index]->do_send(&p);
 	}
 	closesocket(clients[c_id]->_socket);
@@ -66,6 +66,9 @@ void disconnect(int c_id)
 	lock_guard<mutex> ll(clients[c_id]->_s_lock);
 	clients[c_id]->_state = ST_FREE;
 	login_index.erase(c_id);
+
+	User_DB.update_db(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->level, clients[c_id]->_hp, clients[c_id]->exp);
+
 }
 
 void process_packet(int c_id, char* packet)
@@ -74,10 +77,17 @@ void process_packet(int c_id, char* packet)
 	case CS_LOGIN: {
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 		strcpy_s(clients[c_id/*얘가 로그인한걸 알려줌*/]->_name, p->name);
+
+		//만약 db에 없는 아이디 이면 실패
+		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->level, clients[c_id]->_hp, clients[c_id]->exp))
+		{
+			clients[c_id]->_x = -1;
+			//실패했을때
+		}
+		cout << clients[c_id]->_x <<"   " << clients[c_id]->_y << endl;
+
 		{
 			lock_guard<mutex> ll(clients[c_id]->_s_lock);
-			clients[c_id]->_x = 1000;
-			clients[c_id]->_y = 1000;
 			clients[c_id]->_state = ST_INGAME;
 			login_index.insert(c_id);
 		}
@@ -184,6 +194,12 @@ void worker_thread(HANDLE h_iocp) {
 				if (ex_over->_comp_type == OP_SEND) delete ex_over;
 				continue;
 			}
+		}
+
+		if ((0 == num_bytes) && ((ex_over->_comp_type == OP_RECV) || (ex_over->_comp_type == OP_SEND))) {
+			disconnect(static_cast<int>(key));
+			if (ex_over->_comp_type == OP_SEND) delete ex_over;
+			continue;
 		}
 
 		switch (ex_over->_comp_type) {

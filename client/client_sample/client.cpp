@@ -25,14 +25,13 @@ using namespace std;
 
 sf::TcpSocket socket;
 
-constexpr auto SCREEN_WIDTH = 16;
-constexpr auto SCREEN_HEIGHT = 16;
+constexpr auto SCREEN_WIDTH = 20;
+constexpr auto SCREEN_HEIGHT = 20;
 
-constexpr auto TILE_WIDTH = 65;
-constexpr auto WINDOW_WIDTH = SCREEN_WIDTH*TILE_WIDTH;   // size of window
-constexpr auto WINDOW_HEIGHT =SCREEN_WIDTH*TILE_WIDTH;
-constexpr auto MAX_USER = 10000;
-constexpr auto MAX_TREE = 2000;
+constexpr auto TILE_WIDTH = 45;
+constexpr auto WINDOW_WIDTH = SCREEN_WIDTH * TILE_WIDTH + 10;   // size of window
+constexpr auto WINDOW_HEIGHT = SCREEN_WIDTH * TILE_WIDTH + 10;
+
 
 int g_left_x;
 int g_top_y;
@@ -45,21 +44,31 @@ class OBJECT {
 private:
 	bool m_showing;
 	sf::Sprite m_sprite;
-
 	sf::Text m_name;
 	sf::Text m_chat;
+	sf::Clock clock;
+	sf::IntRect rectSprite;
 	chrono::system_clock::time_point m_mess_end_time;
 public:
 	int id;
 	int m_x, m_y;
 	char name[NAME_SIZE];
+	int _hp, _max_hp;
+	int exp, _max_exp;
+	int level;
+	int dir;
+	int power;
 	OBJECT(sf::Texture& t, int x, int y, int x2, int y2) {
 		m_showing = false;
 		m_sprite.setTexture(t);
-		m_sprite.setTextureRect(sf::IntRect(x, y, x2, y2));
+		rectSprite = sf::IntRect(x, y, x2, y2);
+		m_sprite.setTextureRect(rectSprite);
 		set_name("NONAME");
 		m_mess_end_time = chrono::system_clock::now();
 	}
+
+	
+
 	OBJECT() {
 		m_showing = false;
 	}
@@ -86,19 +95,40 @@ public:
 	}
 	void draw() {
 		if (false == m_showing) return;
-		float rx = (m_x - g_left_x) * 65.0f + 8;
-		float ry = (m_y - g_top_y) * 65.0f + 8;
+		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
+		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
 		m_sprite.setPosition(rx, ry);
+		if (clock.getElapsedTime().asSeconds() >0.3f)
+		{ 
+			if (rectSprite.left == 15 + 95 * 3)
+				rectSprite.left = 15;
+			else
+				rectSprite.left += 95;
+
+			m_sprite.setTextureRect(rectSprite);
+			clock.restart();
+		}
+		
+
 		g_window->draw(m_sprite);
 		auto size = m_name.getGlobalBounds();
 		if (m_mess_end_time < chrono::system_clock::now()) {
-			m_name.setPosition(rx + 32 - size.width / 2, ry - 10);
+			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2+10);
 			g_window->draw(m_name);
 		}
 		else {
-			m_chat.setPosition(rx + 32 - size.width / 2, ry - 10);
+			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 +10);
 			g_window->draw(m_chat);
 		}
+	}
+
+	void draw_not_name() {
+		if (false == m_showing) return;
+		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
+		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
+		m_sprite.setPosition(rx, ry);
+		g_window->draw(m_sprite);
+
 	}
 
 	void set_name(const char str[]) {
@@ -107,7 +137,7 @@ public:
 		if (id < MAX_USER) m_name.setFillColor(sf::Color(255, 255, 255));
 		else m_name.setFillColor(sf::Color(255, 255, 0));
 		m_name.setStyle(sf::Text::Bold);
-
+		m_name.scale(0.9, 0.9);
 	}
 
 	void set_chat(const char str[]) {
@@ -125,31 +155,32 @@ unordered_map <int, OBJECT> players;
 
 OBJECT white_tile;
 OBJECT black_tile;
-OBJECT trees[MAX_TREE];
+OBJECT trees[MAX_OBSTACLE];
 
 sf::Texture* board;
 sf::Texture* pieces;
-sf::Texture* plant;
+sf::Texture* rock;
 void client_initialize()
 {
 	board = new sf::Texture;
 	pieces = new sf::Texture;
-	plant = new sf::Texture;
+	rock = new sf::Texture;
 	board->loadFromFile("chessmap.bmp");
-	pieces->loadFromFile("chess2.png");
-	plant->loadFromFile("plant.png");
+	pieces->loadFromFile("player.png");
+	rock->loadFromFile("rock.png");
+	
 	if (false == g_font.loadFromFile("cour.ttf")) {
 		cout << "Font Loading Error!\n";
 		exit(-1);
 	}
-	white_tile = OBJECT{ *board, 5, 5, TILE_WIDTH, TILE_WIDTH };
-	black_tile = OBJECT{ *board, 69, 5, TILE_WIDTH, TILE_WIDTH };
-	avatar = OBJECT{ *pieces, 128, 0, 64, 64 };
-	avatar.move(4, 4);
-
+	white_tile = OBJECT{ *board, 4, 4, TILE_WIDTH, TILE_WIDTH };
+	black_tile = OBJECT{ *board, 70, 4, TILE_WIDTH, TILE_WIDTH };
+	avatar = OBJECT{ *pieces, 15,20, TILE_WIDTH, TILE_WIDTH+5 };
+	
+	
 
 	for (auto& tr : trees) {
-		tr = OBJECT{ *plant, 0, 0, 64, 64 };
+		tr = OBJECT{ *rock, 0, 0, TILE_WIDTH, TILE_WIDTH };
 	}
 
 }
@@ -168,30 +199,29 @@ void ProcessPacket(char* ptr)
 	{
 	case SC_LOGIN_INFO:
 	{
-		SC_LOGIN_INFO_PACKET * packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
+		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
 		g_myid = packet->id;
 		avatar.id = g_myid;
 		avatar.move(packet->x, packet->y);
-		g_left_x = packet->x - 7;
-		g_top_y = packet->y - 7;
+		g_left_x = packet->x - SCREEN_WIDTH / 2;
+		g_top_y = packet->y - SCREEN_WIDTH / 2;
 		avatar.show();
 	}
 	break;
-	case SC_ADD_PLAYER:
+	case SC_ADD_OBJECT:
 	{
-		SC_ADD_PLAYER_PACKET * my_packet = reinterpret_cast<SC_ADD_PLAYER_PACKET*>(ptr);
+		SC_ADD_OBJECT_PACKET* my_packet = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
 		int id = my_packet->id;
 
 		if (id == g_myid) {
 			avatar.move(my_packet->x, my_packet->y);
-			g_left_x = my_packet->x - 7;
-			g_top_y = my_packet->y - 7;
+			g_left_x = my_packet->x - SCREEN_WIDTH / 2;
+			g_top_y = my_packet->y - SCREEN_WIDTH / 2;
 			avatar.show();
 		}
 		else if (id < MAX_USER) {
-			players[id] = OBJECT{ *pieces, 0, 0, 64, 64 };
+			players[id] = OBJECT{ *pieces, 15,20, TILE_WIDTH, TILE_WIDTH + 5 };
 			players[id].id = id;
-			cout << my_packet->x << "  " << my_packet->y << endl;
 			players[id].move(my_packet->x, my_packet->y);
 			players[id].set_name(my_packet->name);
 			players[id].show();
@@ -205,27 +235,25 @@ void ProcessPacket(char* ptr)
 		}
 		break;
 	}
-	case SC_MOVE_PLAYER:
+	case SC_MOVE_OBJECT:
 	{
-		cout << "dd" << endl;
-		SC_MOVE_PLAYER_PACKET* my_packet = reinterpret_cast<SC_MOVE_PLAYER_PACKET*>(ptr);
+		SC_MOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
 		int other_id = my_packet->id;
 		if (other_id == g_myid) {
-			cout << my_packet->x << "    " << my_packet->y << endl;
 			avatar.move(my_packet->x, my_packet->y);
-			g_left_x = my_packet->x - 7;
-			g_top_y = my_packet->y - 7;
+			g_left_x = my_packet->x - SCREEN_WIDTH / 2;
+			g_top_y = my_packet->y - SCREEN_WIDTH / 2;
 		}
 		else {
-			cout << my_packet->x <<"    " << my_packet->y << endl;
+			cout << my_packet->x << "    " << my_packet->y << endl;
 			players[other_id].move(my_packet->x, my_packet->y);
 		}
 		break;
 	}
 
-	case SC_REMOVE_PLAYER:
+	case SC_REMOVE_OBJECT:
 	{
-		SC_REMOVE_PLAYER_PACKET* my_packet = reinterpret_cast<SC_REMOVE_PLAYER_PACKET*>(ptr);
+		SC_REMOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_REMOVE_OBJECT_PACKET*>(ptr);
 		int other_id = my_packet->id;
 		if (other_id == g_myid) {
 			avatar.hide();
@@ -251,7 +279,7 @@ void ProcessPacket(char* ptr)
 	case SC_OBSTACLE:
 	{
 		SC_OBSTACLE_PACKET* my_packet = reinterpret_cast<SC_OBSTACLE_PACKET*>(ptr);
-		
+
 		trees[my_packet->id].m_x = my_packet->x;
 		trees[my_packet->id].m_y = my_packet->y;
 		trees[my_packet->id].show();
@@ -323,7 +351,7 @@ void client_main()
 		}
 
 	for (auto& tr : trees) {
-		tr.draw();
+		tr.draw_not_name();
 	}
 
 	avatar.draw();
@@ -339,9 +367,9 @@ void client_main()
 	g_window->draw(text);
 }
 
-void send_packet(void *packet)
+void send_packet(void* packet)
 {
-	unsigned char *p = reinterpret_cast<unsigned char *>(packet);
+	unsigned char* p = reinterpret_cast<unsigned char*>(packet);
 	size_t sent = 0;
 	socket.send(packet, p[0], sent);
 }
@@ -356,15 +384,19 @@ int main()
 		wcout << L"서버와 연결할 수 없습니다.\n";
 		while (true);
 	}
-
-	client_initialize();
 	CS_LOGIN_PACKET p;
 	p.size = sizeof(p);
 	p.type = CS_LOGIN;
-	strcpy_s(p.name, "TEST");
+
+
+	char arr[16];
+	cout << "Enter ID : ";
+	cin.getline(arr, BUF_SIZE);
+	strcpy_s(p.name, arr);
 	send_packet(&p);
 
-	
+	client_initialize();
+
 
 	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "2D CLIENT");
 	g_window = &window;

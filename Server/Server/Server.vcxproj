@@ -127,6 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DB.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Obstacle.cpp" />
     <ClCompile Include="Player.cpp" />
@@ -135,6 +136,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\protocol.h" />
+    <ClInclude Include="DB.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="Obstacle.h" />
     <ClInclude Include="pch.h" />
