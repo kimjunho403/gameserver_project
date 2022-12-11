@@ -6,6 +6,7 @@ class SESSION abstract
 {
 protected:
 	OVER_EXP _recv_over;
+public:
 
 public:
 	
@@ -19,13 +20,14 @@ public:
 	unsigned last_movetime;
 	mutex _vl;
 	unordered_set <int> _view_list;
-
+	lua_State* _L;
+	mutex	_ll;
 public:
 	int _hp, _max_hp;
-	int exp, _max_exp;
-	short level;
-	short dir;
-	int power;
+	int _exp, _max_exp;
+	short _level;
+	short _dir;
+	int _power;
 
 public:
 	SESSION();
@@ -36,4 +38,5 @@ public:
 	virtual void send_login_info_packet() = 0;
 	virtual void add_session_packet(int c_id, SESSION* clients) = 0;
 	virtual void send_remove_session_packet(int c_id) = 0;
+	
 };

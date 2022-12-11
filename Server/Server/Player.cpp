@@ -30,7 +30,7 @@ void Player::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
 	p.type = SC_MOVE_OBJECT;
 	p.x = clients->_x;
 	p.y = clients->_y;
-	p.dir = clients->dir;
+	p.dir = clients->_dir;
 	p.move_time = move_time;
 	do_send(&p);
 }
@@ -43,6 +43,10 @@ void Player::send_login_info_packet()
 	p.type = SC_LOGIN_INFO;
 	p.x = _x;
 	p.y = _y;
+	p.hp = _hp;
+	p.level = _level;
+	p.exp = _exp;
+
 	strcpy_s(p.name,_name);
 	do_send(&p);
 }
@@ -72,7 +76,6 @@ void Player::send_remove_session_packet(int c_id)
 		
 		return;
 	}
-	cout << "dddfs" << endl;
 	_vl.unlock();
 	SC_REMOVE_OBJECT_PACKET p;
 	p.id = c_id;

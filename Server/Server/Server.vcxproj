@@ -129,6 +129,7 @@
   <ItemGroup>
     <ClCompile Include="DB.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="monster.cpp" />
     <ClCompile Include="Obstacle.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Over_exp.cpp" />
@@ -138,11 +139,15 @@
     <ClInclude Include="..\..\protocol.h" />
     <ClInclude Include="DB.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="monster.h" />
     <ClInclude Include="Obstacle.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Over_exp.h" />
     <ClInclude Include="Session.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="monster.lua" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

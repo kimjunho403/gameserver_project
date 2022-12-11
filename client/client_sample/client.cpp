@@ -41,7 +41,8 @@ sf::RenderWindow* g_window;
 sf::Font g_font;
 
 class OBJECT {
-private:
+
+protected:
 	bool m_showing;
 	sf::Sprite m_sprite;
 	sf::Text m_name;
@@ -54,8 +55,8 @@ public:
 	int id;
 	int m_x, m_y;
 	char name[NAME_SIZE];
-	int _hp, _max_hp;
-	int exp, _max_exp;
+	int hp, max_hp;
+	int exp, max_exp;
 	int level;
 	short dir;
 	int power;
@@ -95,7 +96,7 @@ public:
 		m_y = y;
 	}
 	
-	void set_rotate(int _dir) {
+	virtual void set_rotate(int _dir) {
 		dir = _dir;
 		switch (dir)
 		{
@@ -115,7 +116,7 @@ public:
 		
 	}
 
-	void draw() {
+	virtual void draw() {
 		if (false == m_showing) return;
 		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
 		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
@@ -171,9 +172,60 @@ public:
 	}
 
 };
+class Monster :public OBJECT {
+public:
+	Monster(sf::Texture& t, int x, int y, int x2, int y2) :OBJECT(t, x,y,x2,y2) {};
+	~Monster() {};
+	virtual void draw() {
+		if (false == m_showing) return;
+		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
+		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
+		m_sprite.setPosition(rx, ry);
+		if (clock.getElapsedTime().asSeconds() > 0.3f)
+		{
+			if (rectSprite.left == 50 * 3)
+				rectSprite.left = 0;
+			else
+				rectSprite.left += 50;
+
+			m_sprite.setTextureRect(rectSprite);
+			clock.restart();
+		}
+
+
+		g_window->draw(m_sprite);
+		auto size = m_name.getGlobalBounds();
+		if (m_mess_end_time < chrono::system_clock::now()) {
+			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 10);
+			g_window->draw(m_name);
+		}
+		else {
+			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 10);
+			g_window->draw(m_chat);
+		}
+	}
+
+	virtual void set_rotate(int _dir) {
+		dir = _dir;
+		switch (dir)
+		{
+		case UP:
+			break;
+		case  LEFT:
+			break;
+		case RIGHT:
+			break;
+		case DOWN:
+			
+			break;
+		}
+
+	}
+
+};
 
 OBJECT avatar;
-unordered_map <int, OBJECT> players;
+unordered_map <int, OBJECT*> players;
 
 OBJECT white_tile;
 OBJECT black_tile;
@@ -182,15 +234,18 @@ OBJECT trees[MAX_OBSTACLE];
 sf::Texture* board;
 sf::Texture* pieces;
 sf::Texture* rock;
+sf::Texture* bluesnail;
 void client_initialize()
 {
 	board = new sf::Texture;
 	pieces = new sf::Texture;
 	rock = new sf::Texture;
+	bluesnail = new sf::Texture;
+
 	board->loadFromFile("chessmap.bmp");
 	pieces->loadFromFile("player.png");
 	rock->loadFromFile("rock.png");
-	
+	bluesnail->loadFromFile("Monster1.png");
 	if (false == g_font.loadFromFile("cour.ttf")) {
 		cout << "Font Loading Error!\n";
 		exit(-1);
@@ -229,6 +284,9 @@ void ProcessPacket(char* ptr)
 		g_left_x = packet->x - SCREEN_WIDTH / 2;
 		g_top_y = packet->y - SCREEN_WIDTH / 2;
 		avatar.set_name(packet->name);
+		avatar.exp =  packet->exp;
+		avatar.hp = packet->hp;
+		avatar.level = packet->level;
 		avatar.show();
 	}
 	break;
@@ -245,18 +303,18 @@ void ProcessPacket(char* ptr)
 			avatar.show();
 		}
 		else if (id < MAX_USER) {
-			players[id] = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 };
-			players[id].id = id;
-			players[id].move(my_packet->x, my_packet->y);
-			players[id].set_name(my_packet->name);
-			players[id].show();
+			players[id] = new OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 };
+			players[id]->id = id;
+			players[id]->move(my_packet->x, my_packet->y);
+			players[id]->set_name(my_packet->name);
+			players[id]->show();
 		}
 		else {//NPC
-			players[id] = OBJECT{ *pieces, 256, 0, 64, 64 };
-			players[id].id = id;
-			players[id].move(my_packet->x, my_packet->y);
-			players[id].set_name(my_packet->name);
-			players[id].show();
+			players[id] =new Monster{ *bluesnail, 0,40, TILE_WIDTH, TILE_WIDTH };
+			players[id]->id = id;
+			players[id]->move(my_packet->x, my_packet->y);
+			players[id]->set_name(my_packet->name);
+			players[id]->show();
 		}
 		break;
 	}
@@ -271,8 +329,8 @@ void ProcessPacket(char* ptr)
 			g_top_y = my_packet->y - SCREEN_WIDTH / 2;
 		}
 		else {
-			players[other_id].move(my_packet->x, my_packet->y);
-			players[other_id].set_rotate(my_packet->dir);
+			players[other_id]->move(my_packet->x, my_packet->y);
+			players[other_id]->set_rotate(my_packet->dir);
 		}
 		break;
 	}
@@ -297,7 +355,7 @@ void ProcessPacket(char* ptr)
 			avatar.set_chat(my_packet->mess);
 		}
 		else {
-			players[other_id].set_chat(my_packet->mess);
+			players[other_id]->set_chat(my_packet->mess);
 		}
 
 		break;
@@ -383,14 +441,32 @@ void client_main()
 	avatar.draw();
 	for (auto& pl : players) {
 		//cout << pl.second.m_x << "  " << pl.second.m_y << endl;
-		pl.second.draw();
+		pl.second->draw();
 	}
 	sf::Text text;
 	text.setFont(g_font);
 	char buf[100];
 	sprintf_s(buf, "(%d, %d)", avatar.m_x, avatar.m_y);
+	text.setPosition(WINDOW_WIDTH-200, WINDOW_HEIGHT-50);
 	text.setString(buf);
 	g_window->draw(text);
+	sf::Text text_player_info;
+	text_player_info.setFont(g_font);
+	buf[0] = '\0';
+	sprintf_s(buf, " Level %d", avatar.level);
+	text_player_info.setFillColor(sf::Color(0, 255, 255));
+	text_player_info.setString(buf);
+	g_window->draw(text_player_info);
+	buf[0] = '\0';
+	sprintf_s(buf, "\n HP %d / %d", avatar.hp , avatar.hp*10);
+	text_player_info.setFillColor(sf::Color(255,255,255));
+	text_player_info.setString(buf);
+	
+	sf::RectangleShape rectangle(sf::Vector2f(128.0f * (10.0f / 100.0f), 30.0f));
+	rectangle.setFillColor(sf::Color(255, 0, 0));
+	rectangle.setPosition(10, 40);
+	g_window->draw(rectangle);
+	g_window->draw(text_player_info);
 }
 
 void send_packet(void* packet)
@@ -436,6 +512,7 @@ int main()
 				window.close();
 			if (event.type == sf::Event::KeyPressed) {
 				int direction = -1;
+				bool attack = false;
 				switch (event.key.code) {
 				case sf::Keyboard::Left:
 					direction = 2;
@@ -453,6 +530,9 @@ int main()
 				case sf::Keyboard::Escape:
 					window.close();
 					break;
+				case sf::Keyboard::A:
+					attack = true;
+					break;
 				}
 				if (-1 != direction) {
 					CS_MOVE_PACKET p;
@@ -461,7 +541,13 @@ int main()
 					p.direction = direction;
 					send_packet(&p);
 				}
-
+				if (attack == true)
+				{
+					CS_ATTACK_PACKET p;
+					p.size = sizeof(p);
+					p.type = CS_ATTACK;
+					send_packet(&p);
+				}
 			}
 		}
 

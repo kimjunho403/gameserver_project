@@ -2,19 +2,25 @@
 #include "Over_exp.h"
 #include "Session.h"
 #include "Player.h"
+#include "monster.h"
 #include "Obstacle.h"
 #include "DB.h"
 #include <random>
+
+concurrency::concurrent_priority_queue<TIMER_EVENT> timer_queue;
 
 OVER_EXP g_a_over;//accept용 오버랩드 구조체 얘는 data rece가 아님 
 //동시에 2개의 오버랩드가 완료될리가 없음 
 SOCKET g_c_SOCKET;
 SOCKET g_s_SOCKET; 
 
+
+HANDLE h_iocp;
 array < SESSION*, MAX_USER + MAX_NPC > clients; //오브젝트 풀
 array < Obstacle, MAX_OBSTACLE > obsatcles;
-unordered_set<int> login_index;
 DB User_DB;
+
+
 
 void init_obstacle() {
 	int i = 0;
@@ -70,39 +76,107 @@ bool can_see(int c1, int c2)
 int get_new_client_id()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
-
-		//lock_guard <mutex> ll{ clients[i]->_s_lock };
-		if (clients[i]== nullptr)
-		{
-			clients[i] =new Player;
+		lock_guard <mutex> ll{ clients[i]->_s_lock };
+		if (clients[i]->_state == ST_FREE)
 			return i;
-		}
 	}
 	return -1;
 }
 
 void disconnect(int c_id)
 {
-	for (auto& index : login_index) {
+	clients[c_id]->_vl.lock();
+	unordered_set <int> vl = clients[c_id]->_view_list;
+	clients[c_id]->_vl.unlock();
+	for (auto& p_id : vl) {
+		if (p_id > MAX_USER) continue;
+		auto& pl = clients[p_id];
 		{
-			lock_guard<mutex> ll((clients[index]->_s_lock));
-			if (ST_INGAME != clients[index]->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
+			lock_guard<mutex> ll((pl->_s_lock));
+			if (ST_INGAME != pl->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
 		}
-		if (clients[index]->_id == c_id) continue;
-		SC_REMOVE_OBJECT_PACKET p;
-		p.id = c_id;
-		p.size = sizeof(p);
-		p.type = SC_REMOVE_OBJECT;
-		clients[index]->do_send(&p);
+		if (pl->_id == c_id) continue;
+		pl->send_remove_session_packet(c_id);
 	}
 	closesocket(clients[c_id]->_socket);
 
 	lock_guard<mutex> ll(clients[c_id]->_s_lock);
 	clients[c_id]->_state = ST_FREE;
-	login_index.erase(c_id);
+#ifdef STRESS_TEST
 
-	User_DB.update_db(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->level, clients[c_id]->_hp, clients[c_id]->exp);
+#else
+	User_DB.update_db(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp);
+#endif
+}
 
+void do_npc_random_move(int npc_id)
+{
+	SESSION& npc = *clients[npc_id];
+	unordered_set<int> old_vl;
+	for (auto& obj : clients) {
+		if (ST_INGAME != obj->_state) continue;
+		if (true == obj->_id > MAX_USER) continue;
+		if (true == can_see(npc._id, obj->_id))
+			old_vl.insert(obj->_id);
+	}
+
+	int x = npc._x;
+	int y = npc._y;
+	switch (rand() % 4) {
+	case 0: if (x < (W_WIDTH - 1)) x++; break;
+	case 1: if (x > 0) x--; break;
+	case 2: if (y < (W_HEIGHT - 1)) y++; break;
+	case 3:if (y > 0) y--; break;
+	}
+	npc._x = x;
+	npc._y = y;
+
+	unordered_set<int> new_vl;
+	for (auto& obj : clients) {
+		if (ST_INGAME != obj->_state) continue;
+		if (true == obj->_id > MAX_USER) continue;
+		if (true == can_see(npc._id, obj->_id))
+			new_vl.insert(obj->_id);
+	}
+
+	for (auto pl : new_vl) {
+		if (0 == old_vl.count(pl)) {
+			// 플레이어의 시야에 등장
+			clients[pl]->add_session_packet(npc._id,clients[npc._id]);
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			clients[pl]->send_move_packet(npc._id, clients[npc._id], clients[npc._id]->last_movetime);
+		}
+	}
+	///vvcxxccxvvdsvdvds
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			clients[pl]->_vl.lock();
+			if (0 != clients[pl]->_view_list.count(npc._id)) {
+				clients[pl]->_vl.unlock();
+				clients[pl]->send_remove_session_packet(npc._id);
+			}
+			else {
+				clients[pl]->_vl.unlock();
+			}
+		}
+	}
+}
+
+void WakeUpNPC(int npc_id, int waker)
+{
+	OVER_EXP* exover = new OVER_EXP;
+	exover->_comp_type = OP_AI_HELLO;
+	exover->_ai_target_obj = waker;
+	PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->_over);
+
+	if (reinterpret_cast<Monster*>(clients[npc_id])->_is_active) return;
+	bool old_state = false;
+	if (false == atomic_compare_exchange_strong(&reinterpret_cast<Monster*>(clients[npc_id])->_is_active, &old_state, true))
+		return;
+	TIMER_EVENT ev{ npc_id, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
+	timer_queue.push(ev);
 }
 
 void process_packet(int c_id, char* packet)
@@ -113,30 +187,37 @@ void process_packet(int c_id, char* packet)
 		strcpy_s(clients[c_id/*얘가 로그인한걸 알려줌*/]->_name, p->name);
 
 		//만약 db에 없는 아이디 이면 실패
-		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->level, clients[c_id]->_hp, clients[c_id]->exp))
+#ifdef STRESS_TEST
+		{
+			lock_guard<mutex> ll{ clients[c_id]->_s_lock };
+			clients[c_id]->_x = rand() % W_WIDTH;
+			clients[c_id]->_y = rand() % W_HEIGHT;
+			cout << clients[c_id]->_x <<"        " << clients[c_id]->_y << endl;
+		}
+#else
+		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))
 		{
 			clients[c_id]->_x = -1;
 			//실패했을때
 		}
 		cout << clients[c_id]->_x <<"   " << clients[c_id]->_y << endl;
-
+#endif
 		{
 			lock_guard<mutex> ll(clients[c_id]->_s_lock);
 			clients[c_id]->_state = ST_INGAME;
-			login_index.insert(c_id);
 		}
 		clients[c_id]->send_login_info_packet(); //나한테 
 
-		for (auto& index : login_index) {//내 정보를 다른 클라한테 정보 넘기자
+		for (auto& cl : clients) {//내 정보를 다른 클라한테 정보 넘기자
 			{
-				lock_guard<mutex> ll(clients[index]->_s_lock);
-				if (ST_INGAME != clients[index]->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
+				lock_guard<mutex> ll(cl->_s_lock);
+				if (ST_INGAME != cl->_state) continue;//이 클라가 사용중이면 알려줄필요가없음
 			}
-		//	if (pl == nullptr) continue;
-			if (clients[index]->_id == c_id) continue;//내 자신에게 보낼필요는 없음 
-			if (false == can_see(c_id, clients[index]->_id)) continue;			
-			if(clients[index]->_id<MAX_USER) clients[index]->add_session_packet(c_id, clients[c_id]);
-			clients[c_id]->add_session_packet(index, clients[index]);
+			if (cl->_id == c_id) continue;//내 자신에게 보낼필요는 없음 
+			if (false == can_see(c_id, cl->_id)) continue;
+			if (cl->_id < MAX_USER)cl->add_session_packet(c_id, clients[c_id]);
+			else WakeUpNPC(cl->_id, c_id);
+			clients[c_id]->add_session_packet(cl->_id, cl);
 		}
 		//장애물 위치 
 		for (auto& ob : obsatcles) {
@@ -153,10 +234,10 @@ void process_packet(int c_id, char* packet)
 		if (!is_collision(clients[c_id], p->direction)) {
 
 			switch (p->direction) {
-			case DOWN: if (y > 0) y--; clients[c_id]->dir = DOWN;  break;
-			case UP: if (y < W_HEIGHT - 1) y++; clients[c_id]->dir = UP; break;
-			case LEFT: if (x > 0) x--; clients[c_id]->dir = LEFT; break;
-			case RIGHT: if (x < W_WIDTH - 1) x++; clients[c_id]->dir = RIGHT; break;
+			case DOWN: if (y > 0) y--; clients[c_id]->_dir = DOWN;  break;
+			case UP: if (y < W_HEIGHT - 1) y++; clients[c_id]->_dir = UP; break;
+			case LEFT: if (x > 0) x--; clients[c_id]->_dir = LEFT; break;
+			case RIGHT: if (x < W_WIDTH - 1) x++; clients[c_id]->_dir = RIGHT; break;
 			}
 
 			}
@@ -168,10 +249,10 @@ void process_packet(int c_id, char* packet)
 		clients[c_id]->_vl.lock();
 		unordered_set<int> old_vlist = clients[c_id]->_view_list;
 		clients[c_id]->_vl.unlock();
-		for (auto& index : login_index) {
-			if (ST_INGAME != clients[index]->_state) continue;
-			if (clients[index]->_id == c_id) continue;
-			if (can_see(c_id, clients[index]->_id)) near_list.insert(clients[index]->_id);
+		for (auto& cl : clients) {
+			if (ST_INGAME != cl->_state) continue;
+			if (cl->_id == c_id) continue;
+			if (can_see(c_id, cl->_id)) near_list.insert(cl->_id);
 			
 		}
 		clients[c_id]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
@@ -190,10 +271,12 @@ void process_packet(int c_id, char* packet)
 					cpl->_vl.unlock();
 					clients[near_pl]->add_session_packet(c_id, clients[c_id]);
 				}
+			}
+			else WakeUpNPC(near_pl, c_id);
 
 				if (old_vlist.count(near_pl) == 0)
 					clients[c_id]->add_session_packet(near_pl, clients[near_pl]);
-			}
+			
 		}
 		//viewlist에서 사라졌다면 remove 패킷 전달 
 		for (auto& index : old_vlist) {
@@ -203,6 +286,17 @@ void process_packet(int c_id, char* packet)
 		}
 
 		}
+		break;
+	}
+	case CS_ATTACK: {
+		CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
+	
+		//npc 뷰리스트에서 공격체크 
+
+		//맞았으면 피깎음
+		
+		// 죽었으면 exp 올리고 레벨 올라가면 올리고 30초 후 부활하게 
+
 		break;
 	}
 	}
@@ -288,8 +382,120 @@ void worker_thread(HANDLE h_iocp) {
 		case OP_SEND:
 			delete ex_over;
 			break;
+		case OP_NPC_MOVE: {
+			bool keep_alive = false;
+			for (int j = 0; j < MAX_USER; ++j) {
+				if (clients[j]->_state != ST_INGAME) continue;
+				if (can_see(static_cast<int>(key), j)) {
+					keep_alive = true;
+					break;
+				}
+			}
+			if (true == keep_alive) {
+				do_npc_random_move(static_cast<int>(key));
+				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
+				timer_queue.push(ev);
+			}
+			else {
+				reinterpret_cast<Monster*>(clients[key])->_is_active = false;
+			}
+			delete ex_over;
+		}
+						break;
 		}
 
+	}
+}
+
+void InitiallizePlayer() {
+	for (int i = 0; i < MAX_USER ; ++i) {
+		clients[i] = new Player;
+	}
+}
+//스크립트 함수
+int API_get_x(lua_State* L)
+{
+	int user_id =
+		(int)lua_tointeger(L, -1);
+	lua_pop(L, 2);
+	int x = clients[user_id]->_x;
+	lua_pushnumber(L, x);
+	return 1;
+}
+
+int API_get_y(lua_State* L)
+{
+	int user_id =
+		(int)lua_tointeger(L, -1);
+	lua_pop(L, 2);
+	int y = clients[user_id]->_y;
+	lua_pushnumber(L, y);
+	return 1;
+}
+
+int API_SendMessage(lua_State* L)
+{
+	int my_id = (int)lua_tointeger(L, -3);
+	int user_id = (int)lua_tointeger(L, -2);
+	char* mess = (char*)lua_tostring(L, -1);
+
+	lua_pop(L, 4);
+
+	//clients[user_id]->send_chat_packet(my_id, mess);
+	return 0;
+}
+
+void InitializeNPC()
+{
+	cout << "NPC intialize begin.\n";
+
+	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
+		clients[i] = new Monster;
+		clients[i]->_x = rand() % W_WIDTH;
+		clients[i]->_y = rand() % W_HEIGHT;
+		clients[i]->_id = i;
+		sprintf_s(clients[i]->_name, "NPC%d", i);
+		clients[i]->_state = ST_INGAME;
+
+		auto L = clients[i]->_L = luaL_newstate();
+		luaL_openlibs(L);
+		luaL_loadfile(L, "npc.lua");
+		lua_pcall(L, 0, 0, 0);
+
+		lua_getglobal(L, "set_uid");
+		lua_pushnumber(L, i);
+		lua_pcall(L, 1, 0, 0);
+		// lua_pop(L, 1);// eliminate set_uid from stack after call
+
+		lua_register(L, "API_SendMessage", API_SendMessage);
+		lua_register(L, "API_get_x", API_get_x);
+		lua_register(L, "API_get_y", API_get_y);
+	}
+	cout << "NPC initialize end.\n";
+}
+
+void do_timer()
+{
+	while (true) {
+		TIMER_EVENT ev;
+		auto current_time = chrono::system_clock::now();
+		if (true == timer_queue.try_pop(ev)) {
+			if (ev.wakeup_time > current_time) {
+				timer_queue.push(ev);		// 최적화 필요
+				// timer_queue에 다시 넣지 않고 처리해야 한다.
+				this_thread::sleep_for(1ms);  // 실행시간이 아직 안되었으므로 잠시 대기
+				continue;
+			}
+			switch (ev.event_id) {
+			case EV_RANDOM_MOVE:
+				OVER_EXP* ov = new OVER_EXP;
+				ov->_comp_type = OP_NPC_MOVE;
+				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
+				break;
+			}
+			continue;		// 즉시 다음 작업 꺼내기
+		}
+		this_thread::sleep_for(1ms);   // timer_queue가 비어 있으니 잠시 기다렸다가 다시 시작
 	}
 }
 
@@ -297,8 +503,8 @@ int main()
 {
 	srand(time(NULL));
 	init_obstacle();
-
-	HANDLE h_iocp;
+	InitiallizePlayer();
+	InitializeNPC();
 
 	WSADATA WSAData;
 	WSAStartup(MAKEWORD(2, 2), &WSAData);
@@ -326,6 +532,8 @@ int main()
 	for (int i = 0; i < num_threads; ++i) {
 		worker_threads.emplace_back(worker_thread, h_iocp);
 	}
+	thread timer_thread{ do_timer };
+	timer_thread.join();
 	for (auto& th : worker_threads) {
 		th.join();
 	}

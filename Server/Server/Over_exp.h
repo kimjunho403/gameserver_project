@@ -1,6 +1,6 @@
 #pragma once
 
-enum COMP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND }; 
+enum COMP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND,OP_NPC_MOVE, OP_AI_HELLO};
 
 class OVER_EXP
 {
@@ -9,6 +9,7 @@ public:
 	WSABUF _wsabuf;
 	char _send_buf[BUF_SIZE];
 	COMP_TYPE _comp_type;
+	int _ai_target_obj;
 	OVER_EXP()
 	{
 		_wsabuf.len = BUF_SIZE;
