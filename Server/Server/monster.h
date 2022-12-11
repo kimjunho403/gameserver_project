@@ -21,7 +21,7 @@ class Monster : public SESSION
 {
 public:
 	atomic_bool	_is_active;		// 주위에 플레이어가 있는가?
-
+	atomic_bool _is_die;
 public:
 	virtual void do_recv() override;
 	virtual void do_send(void* packet) override;

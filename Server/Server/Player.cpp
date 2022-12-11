@@ -63,6 +63,7 @@ void Player::add_session_packet(int c_id, SESSION* clients)
 	_vl.lock();
 	_view_list.insert(c_id);
 	_vl.unlock();
+
 	do_send(&add_packet);
 }
 
@@ -92,5 +93,29 @@ void Player::send_obstacle_pos_packet(Obstacle* _obstacle)
 	p.type = SC_OBSTACLE;
 	p.x = _obstacle->_x;
 	p.y = _obstacle->_y;
+	do_send(&p);
+}
+
+void Player::send_player_info_packet(int c_id)
+{
+	SC_PLAYERINFO_PACKET p;
+	p.id = _id;
+	p.size = sizeof(SC_PLAYERINFO_PACKET);
+	p.type = SC_PLAYERINFO;
+	p.hp = _hp;
+	p.max_hp = _hp;
+	p.exp = _exp;
+	p.level = _level;
+
+	do_send(&p);
+}
+
+void Player::send_player_attack_packet(int c_id)
+{
+	SC_PLAYERATTACK_PACKET p;
+	p.id = _id;
+	p.size = sizeof(SC_PLAYERATTACK_PACKET);
+	p.type = SC_PLAYERATTACK;
+
 	do_send(&p);
 }

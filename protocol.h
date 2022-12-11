@@ -32,6 +32,8 @@ constexpr char SC_LOGIN_OK = 7;
 constexpr char SC_LOGIN_FAIL = 8;
 constexpr char SC_STAT_CHANGE = 9;
 constexpr char SC_OBSTACLE = 10;
+constexpr char SC_PLAYERINFO = 11;
+constexpr char SC_PLAYERATTACK = 12;
 #pragma pack (push, 1)
 
 struct CS_LOGIN_PACKET {
@@ -138,4 +140,20 @@ struct SC_OBSTACLE_PACKET {
 	short	x, y;
 };
 
+struct SC_PLAYERINFO_PACKET {
+	unsigned char size;
+	char	type;
+	int		id;
+	int		hp;
+	int		max_hp;
+	int		exp;
+	int		level;
+};
+
+struct SC_PLAYERATTACK_PACKET {
+	unsigned char size;
+	char	type;
+	int		id;
+	
+};
 #pragma pack (pop)

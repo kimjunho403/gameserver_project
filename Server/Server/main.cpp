@@ -113,26 +113,26 @@ void do_npc_random_move(int npc_id)
 {
 	SESSION& npc = *clients[npc_id];
 	unordered_set<int> old_vl;
-	for (auto& obj : clients) {
+	for (auto& obj : clients) {//npc기준 시야에 닿는 유저 뷰리스트에 유저 추가
 		if (ST_INGAME != obj->_state) continue;
 		if (true == obj->_id > MAX_USER) continue;
 		if (true == can_see(npc._id, obj->_id))
 			old_vl.insert(obj->_id);
 	}
 
-	int x = npc._x;
-	int y = npc._y;
-	switch (rand() % 4) {
-	case 0: if (x < (W_WIDTH - 1)) x++; break;
-	case 1: if (x > 0) x--; break;
-	case 2: if (y < (W_HEIGHT - 1)) y++; break;
-	case 3:if (y > 0) y--; break;
-	}
-	npc._x = x;
-	npc._y = y;
+	//int x = npc._x;
+	//int y = npc._y;
+	//switch (rand() % 4) {
+	//case 0: if (x < (W_WIDTH - 1)) x++; break;
+	//case 1: if (x > 0) x--; break;
+	//case 2: if (y < (W_HEIGHT - 1)) y++; break;
+	//case 3:if (y > 0) y--; break;
+	//}
+	//npc._x = x;
+	//npc._y = y;
 
 	unordered_set<int> new_vl;
-	for (auto& obj : clients) {
+	for (auto& obj : clients) {//좌표 변환후 뷰 리스트에 유저 추가
 		if (ST_INGAME != obj->_state) continue;
 		if (true == obj->_id > MAX_USER) continue;
 		if (true == can_see(npc._id, obj->_id))
@@ -149,7 +149,7 @@ void do_npc_random_move(int npc_id)
 			clients[pl]->send_move_packet(npc._id, clients[npc._id], clients[npc._id]->last_movetime);
 		}
 	}
-	///vvcxxccxvvdsvdvds
+	///시야에 있었다가 사라짐
 	for (auto pl : old_vl) {
 		if (0 == new_vl.count(pl)) {
 			clients[pl]->_vl.lock();
@@ -289,15 +289,98 @@ void process_packet(int c_id, char* packet)
 		break;
 	}
 	case CS_ATTACK: {
-		CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
+		//CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
 	
-		//npc 뷰리스트에서 공격체크 
+		//clients[c_id]->_vl.lock();
+		//unordered_set<int> old_vlist = clients[c_id]->_view_list;
+		//clients[c_id]->_vl.unlock();
 
-		//맞았으면 피깎음
-		
-		// 죽었으면 exp 올리고 레벨 올라가면 올리고 30초 후 부활하게 
+		////npc 뷰리스트에서 공격체크 
+		//for (auto& near_pl : old_vlist) {
+		//	auto& cpl = clients[near_pl];
+		//	if (clients[near_pl]->_id > MAX_USER) {
+		//		cpl->_vl.lock();
+		//		if (clients[near_pl]->_view_list.count(c_id)) {
+		//			cpl->_vl.unlock();
+		//			switch (clients[c_id]->_dir)
+		//			{
+		//			case LEFT:
+		//				if (clients[near_pl]->_x+1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+		//					clients[near_pl]->_hp -= clients[c_id]->_power;
 
-		break;
+		//					if (clients[near_pl]->_hp <= 0) {
+		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
+		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
+		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
+		//							clients[c_id]->_exp = 0;
+		//							clients[c_id]->_level += 1;
+		//						}
+		//					}
+		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
+		//				}
+		//				break;
+		//			case RIGHT:
+		//				if (clients[near_pl]->_x -1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+		//					clients[near_pl]->_hp -= clients[c_id]->_power;
+
+		//					if (clients[near_pl]->_hp <= 0) {
+		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
+		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
+		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
+		//							clients[c_id]->_exp = 0;
+		//							clients[c_id]->_level += 1;
+		//						}
+		//					}
+		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
+		//				}
+		//				break;
+		//			case UP:
+		//				if (clients[near_pl]->_x  == clients[c_id]->_x && clients[near_pl]->_y+1 == clients[c_id]->_y) {
+		//					clients[near_pl]->_hp -= clients[c_id]->_power;
+
+		//					if (clients[near_pl]->_hp <= 0) {
+		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
+		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
+		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
+		//							clients[c_id]->_exp = 0;
+		//							clients[c_id]->_level += 1;
+		//						}
+		//					}
+		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
+		//				}
+		//				break;
+		//			case DOWN:
+		//				if (clients[near_pl]->_x== clients[c_id]->_x && clients[near_pl]->_y-1 == clients[c_id]->_y) {
+		//					clients[near_pl]->_hp -= clients[c_id]->_power;
+
+		//					if (clients[near_pl]->_hp <= 0) {
+		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
+		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
+		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
+		//							clients[c_id]->_exp = 0;
+		//							clients[c_id]->_level += 1;
+		//						}
+		//					}
+		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
+		//				}
+		//				break;
+		//			}
+		//			
+		//		}
+		//		
+		//	}
+		//	else { //player to player
+		//		reinterpret_cast<Player*>(clients[c_id])->send_player_attack_packet(near_pl);
+		//		reinterpret_cast<Player*>(clients[near_pl])->send_player_attack_packet(c_id);
+		//	}
+		////	else WakeUpNPC(near_pl, c_id);
+
+		//	/*if (old_vlist.count(near_pl) == 0)
+		//		clients[c_id]->add_session_packet(near_pl, clients[near_pl]);*/
+
+		//}
+		//// 죽었으면 exp 올리고 레벨 올라가면 올리고 30초 후 부활하게 
+		//break;
 	}
 	}
 }
@@ -453,6 +536,10 @@ void InitializeNPC()
 		clients[i] = new Monster;
 		clients[i]->_x = rand() % W_WIDTH;
 		clients[i]->_y = rand() % W_HEIGHT;
+		clients[i]->_level =1+ rand() % 20;
+		clients[i]->_hp = 10 * clients[i]->_level;
+		clients[i]->_power = clients[i]->_level * 5;
+		
 		clients[i]->_id = i;
 		sprintf_s(clients[i]->_name, "NPC%d", i);
 		clients[i]->_state = ST_INGAME;

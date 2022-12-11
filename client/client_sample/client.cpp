@@ -36,21 +36,25 @@ constexpr auto WINDOW_HEIGHT = SCREEN_WIDTH * TILE_WIDTH + 10;
 int g_left_x;
 int g_top_y;
 int g_myid;
-
 sf::RenderWindow* g_window;
 sf::Font g_font;
 
 class OBJECT {
 
 protected:
+	
 	bool m_showing;
 	sf::Sprite m_sprite;
+	sf::Sprite m_sprite_attack;
 	sf::Text m_name;
 	sf::Text m_chat;
 	sf::Clock clock;
+	sf::Clock attack_clock;
 	sf::IntRect rectSprite;
+	sf::IntRect rectSprite_attack;
 	chrono::system_clock::time_point m_mess_end_time;
 public:
+	bool _is_attack;
 	int rectSprite_left;
 	int id;
 	int m_x, m_y;
@@ -69,7 +73,18 @@ public:
 		m_mess_end_time = chrono::system_clock::now();
 	}
 
-	
+	OBJECT(sf::Texture& t, int x, int y, int x2, int y2, sf::Sprite& a_t) {
+		m_showing = false;
+		m_sprite.setTexture(t);
+		rectSprite = sf::IntRect(x, y, x2, y2);
+		m_sprite.setTextureRect(rectSprite);
+		set_name("NONAME");
+		m_mess_end_time = chrono::system_clock::now();
+
+		m_sprite_attack = a_t;
+		m_sprite_attack.setScale(0.5f, 0.5f);
+		rectSprite_attack = sf::IntRect(20, 20, 190, 170);
+	}
 
 	OBJECT() {
 		m_showing = false;
@@ -95,7 +110,7 @@ public:
 		m_x = x;
 		m_y = y;
 	}
-	
+
 	virtual void set_rotate(int _dir) {
 		dir = _dir;
 		switch (dir)
@@ -113,7 +128,7 @@ public:
 			rectSprite.top = 225;
 			break;
 		}
-		
+
 	}
 
 	virtual void draw() {
@@ -121,8 +136,8 @@ public:
 		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
 		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
 		m_sprite.setPosition(rx, ry);
-		if (clock.getElapsedTime().asSeconds() >0.3f)
-		{ 
+		if (clock.getElapsedTime().asSeconds() > 0.3f)
+		{
 			if (rectSprite.left == 20 + 95 * 3)
 				rectSprite.left = 20;
 			else
@@ -131,16 +146,16 @@ public:
 			m_sprite.setTextureRect(rectSprite);
 			clock.restart();
 		}
-		
+
 
 		g_window->draw(m_sprite);
 		auto size = m_name.getGlobalBounds();
 		if (m_mess_end_time < chrono::system_clock::now()) {
-			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2+10);
+			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 10);
 			g_window->draw(m_name);
 		}
 		else {
-			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 +10);
+			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 10);
 			g_window->draw(m_chat);
 		}
 	}
@@ -171,10 +186,52 @@ public:
 		m_mess_end_time = chrono::system_clock::now() + chrono::seconds(3);
 	}
 
+
+
+	void attack() {
+		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
+		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
+		switch (dir)
+		{
+		case LEFT:
+			m_sprite_attack.setPosition(rx - TILE_WIDTH, ry);
+			break;
+		case RIGHT:
+			m_sprite_attack.setPosition(rx + TILE_WIDTH, ry);
+			break;
+		case UP:
+			m_sprite_attack.setPosition(rx, ry + TILE_WIDTH);
+			break;
+		case DOWN:
+			m_sprite_attack.setPosition(rx, ry - TILE_WIDTH);
+			break;
+		}
+
+		if (attack_clock.getElapsedTime().asSeconds() > 0.1f)
+		{
+			cout << rectSprite_attack.top << endl;
+			if (rectSprite_attack.left == 20 + 190 * 4) {
+				rectSprite_attack.left = 20;
+				_is_attack = false;
+			}
+			else
+				rectSprite_attack.left += 190;
+
+			m_sprite_attack.setTextureRect(rectSprite_attack);
+			attack_clock.restart();
+		}
+
+
+		//	attack_clock.restart();
+
+		g_window->draw(m_sprite_attack);
+
+	}
 };
+
 class Monster :public OBJECT {
 public:
-	Monster(sf::Texture& t, int x, int y, int x2, int y2) :OBJECT(t, x,y,x2,y2) {};
+	Monster(sf::Texture& t, int x, int y, int x2, int y2) :OBJECT(t, x, y, x2, y2) {};
 	~Monster() {};
 	virtual void draw() {
 		if (false == m_showing) return;
@@ -216,7 +273,7 @@ public:
 		case RIGHT:
 			break;
 		case DOWN:
-			
+
 			break;
 		}
 
@@ -235,26 +292,37 @@ sf::Texture* board;
 sf::Texture* pieces;
 sf::Texture* rock;
 sf::Texture* bluesnail;
+sf::Texture* attack_t;
+sf::Sprite* m_sprite;
 void client_initialize()
 {
 	board = new sf::Texture;
 	pieces = new sf::Texture;
 	rock = new sf::Texture;
 	bluesnail = new sf::Texture;
+	attack_t = new sf::Texture;
+	m_sprite = new sf::Sprite;
 
 	board->loadFromFile("chessmap.bmp");
 	pieces->loadFromFile("player.png");
 	rock->loadFromFile("rock.png");
 	bluesnail->loadFromFile("Monster1.png");
+	attack_t->loadFromFile("attack.png");
+
+
+	m_sprite->setTexture(*attack_t);
+	//m_sprite->setTextureRect(sf::IntRect(420, 140, 30, 26));
+	m_sprite->setTextureRect(sf::IntRect(420, 270, 30, 26));
+
 	if (false == g_font.loadFromFile("cour.ttf")) {
 		cout << "Font Loading Error!\n";
 		exit(-1);
 	}
 	white_tile = OBJECT{ *board, 4, 4, TILE_WIDTH, TILE_WIDTH };
 	black_tile = OBJECT{ *board, 70, 4, TILE_WIDTH, TILE_WIDTH };
-	avatar = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH+5 };
-	
-	
+	avatar = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5, *m_sprite };
+
+
 
 	for (auto& tr : trees) {
 		tr = OBJECT{ *rock, 0, 0, TILE_WIDTH, TILE_WIDTH };
@@ -267,6 +335,10 @@ void client_finish()
 	players.clear();
 	delete board;
 	delete pieces;
+	delete rock;
+	delete bluesnail;
+	delete attack_t;
+	delete m_sprite;
 }
 
 void ProcessPacket(char* ptr)
@@ -284,7 +356,7 @@ void ProcessPacket(char* ptr)
 		g_left_x = packet->x - SCREEN_WIDTH / 2;
 		g_top_y = packet->y - SCREEN_WIDTH / 2;
 		avatar.set_name(packet->name);
-		avatar.exp =  packet->exp;
+		avatar.exp = packet->exp;
 		avatar.hp = packet->hp;
 		avatar.level = packet->level;
 		avatar.show();
@@ -297,20 +369,20 @@ void ProcessPacket(char* ptr)
 
 		if (id == g_myid) {
 			avatar.move(my_packet->x, my_packet->y);
-			
+
 			g_left_x = my_packet->x - SCREEN_WIDTH / 2;
 			g_top_y = my_packet->y - SCREEN_WIDTH / 2;
 			avatar.show();
 		}
 		else if (id < MAX_USER) {
-			players[id] = new OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 };
+			players[id] = new OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 , *m_sprite };
 			players[id]->id = id;
 			players[id]->move(my_packet->x, my_packet->y);
 			players[id]->set_name(my_packet->name);
 			players[id]->show();
 		}
 		else {//NPC
-			players[id] =new Monster{ *bluesnail, 0,40, TILE_WIDTH, TILE_WIDTH };
+			players[id] = new Monster{ *bluesnail, 0,40, TILE_WIDTH, TILE_WIDTH };
 			players[id]->id = id;
 			players[id]->move(my_packet->x, my_packet->y);
 			players[id]->set_name(my_packet->name);
@@ -363,10 +435,25 @@ void ProcessPacket(char* ptr)
 	case SC_OBSTACLE:
 	{
 		SC_OBSTACLE_PACKET* my_packet = reinterpret_cast<SC_OBSTACLE_PACKET*>(ptr);
-
 		trees[my_packet->id].m_x = my_packet->x;
 		trees[my_packet->id].m_y = my_packet->y;
 		trees[my_packet->id].show();
+		break;
+	}
+	case SC_PLAYERINFO:
+	{
+		SC_PLAYERINFO_PACKET* my_packet = reinterpret_cast<SC_PLAYERINFO_PACKET*>(ptr);
+		players[my_packet->id]->hp = my_packet->hp;
+		players[my_packet->id]->exp = my_packet->exp;
+		players[my_packet->id]->level = my_packet->level;
+
+		break;
+	}
+	case SC_PLAYERATTACK:
+	{
+		SC_PLAYERATTACK_PACKET* my_packet = reinterpret_cast<SC_PLAYERATTACK_PACKET*>(ptr);
+
+		players[my_packet->id]->attack();
 		break;
 	}
 	default:
@@ -439,6 +526,8 @@ void client_main()
 	}
 
 	avatar.draw();
+	
+	
 	for (auto& pl : players) {
 		//cout << pl.second.m_x << "  " << pl.second.m_y << endl;
 		pl.second->draw();
@@ -447,7 +536,7 @@ void client_main()
 	text.setFont(g_font);
 	char buf[100];
 	sprintf_s(buf, "(%d, %d)", avatar.m_x, avatar.m_y);
-	text.setPosition(WINDOW_WIDTH-200, WINDOW_HEIGHT-50);
+	text.setPosition(WINDOW_WIDTH - 200, WINDOW_HEIGHT - 50);
 	text.setString(buf);
 	g_window->draw(text);
 	sf::Text text_player_info;
@@ -458,15 +547,19 @@ void client_main()
 	text_player_info.setString(buf);
 	g_window->draw(text_player_info);
 	buf[0] = '\0';
-	sprintf_s(buf, "\n HP %d / %d", avatar.hp , avatar.hp*10);
-	text_player_info.setFillColor(sf::Color(255,255,255));
+	sprintf_s(buf, "\n HP %d / %d", avatar.hp, avatar.hp * 10);
+	text_player_info.setFillColor(sf::Color(255, 255, 255));
 	text_player_info.setString(buf);
-	
+
 	sf::RectangleShape rectangle(sf::Vector2f(128.0f * (10.0f / 100.0f), 30.0f));
 	rectangle.setFillColor(sf::Color(255, 0, 0));
 	rectangle.setPosition(10, 40);
 	g_window->draw(rectangle);
 	g_window->draw(text_player_info);
+
+	if (avatar._is_attack == true) {
+		avatar.attack();
+	}
 }
 
 void send_packet(void* packet)
@@ -532,6 +625,7 @@ int main()
 					break;
 				case sf::Keyboard::A:
 					attack = true;
+					avatar._is_attack = true;
 					break;
 				}
 				if (-1 != direction) {
@@ -541,13 +635,14 @@ int main()
 					p.direction = direction;
 					send_packet(&p);
 				}
-				if (attack == true)
+				/*if (attack == true)
 				{
 					CS_ATTACK_PACKET p;
 					p.size = sizeof(p);
 					p.type = CS_ATTACK;
 					send_packet(&p);
-				}
+					attack = false;
+				}*/
 			}
 		}
 
