@@ -1,7 +1,24 @@
+math.randomseed(os.time())
+
 myid = 99999;
+level = math.random(10)
+hp = 10
+power = level *10
+exp = level*5
 
 function set_uid(x)
    myid = x;
+end
+
+function set_hp(x,player)
+   hp =hp - x;
+   if(hp <=0) then
+       API_MonsterDie(player,exp);
+   end
+end
+
+function get_exp()
+   return exp;
 end
 
 function event_player_move(player)

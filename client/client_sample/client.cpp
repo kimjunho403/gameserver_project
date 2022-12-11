@@ -89,6 +89,7 @@ public:
 	OBJECT() {
 		m_showing = false;
 	}
+	
 	void show()
 	{
 		m_showing = true;
@@ -442,10 +443,20 @@ void ProcessPacket(char* ptr)
 	}
 	case SC_PLAYERINFO:
 	{
+		cout << "ddddfdsf" << endl;
 		SC_PLAYERINFO_PACKET* my_packet = reinterpret_cast<SC_PLAYERINFO_PACKET*>(ptr);
-		players[my_packet->id]->hp = my_packet->hp;
-		players[my_packet->id]->exp = my_packet->exp;
-		players[my_packet->id]->level = my_packet->level;
+		int other_id = my_packet->id;
+		if (other_id == g_myid) {
+			avatar.hp = my_packet->hp;
+			avatar.exp = my_packet->exp;
+			avatar.level = my_packet->level;
+		}
+		else {
+			players[other_id]->hp = my_packet->hp;
+			players[other_id]->exp = my_packet->exp;
+			players[other_id]->level = my_packet->level;
+		}
+		
 
 		break;
 	}
@@ -635,14 +646,14 @@ int main()
 					p.direction = direction;
 					send_packet(&p);
 				}
-				/*if (attack == true)
+				if (attack == true)
 				{
 					CS_ATTACK_PACKET p;
 					p.size = sizeof(p);
 					p.type = CS_ATTACK;
 					send_packet(&p);
 					attack = false;
-				}*/
+				}
 			}
 		}
 

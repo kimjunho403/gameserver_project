@@ -200,6 +200,8 @@ void process_packet(int c_id, char* packet)
 			clients[c_id]->_x = -1;
 			//실패했을때
 		}
+		else { clients[c_id]->_power = clients[c_id]->_level * 5; };
+
 		cout << clients[c_id]->_x <<"   " << clients[c_id]->_y << endl;
 #endif
 		{
@@ -290,98 +292,90 @@ void process_packet(int c_id, char* packet)
 	}
 	case CS_ATTACK: {
 		//CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
-	
-		//clients[c_id]->_vl.lock();
-		//unordered_set<int> old_vlist = clients[c_id]->_view_list;
-		//clients[c_id]->_vl.unlock();
 
-		////npc 뷰리스트에서 공격체크 
-		//for (auto& near_pl : old_vlist) {
-		//	auto& cpl = clients[near_pl];
-		//	if (clients[near_pl]->_id > MAX_USER) {
-		//		cpl->_vl.lock();
-		//		if (clients[near_pl]->_view_list.count(c_id)) {
-		//			cpl->_vl.unlock();
-		//			switch (clients[c_id]->_dir)
-		//			{
-		//			case LEFT:
-		//				if (clients[near_pl]->_x+1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
-		//					clients[near_pl]->_hp -= clients[c_id]->_power;
+		clients[c_id]->_vl.lock();
+		unordered_set<int> old_vlist = clients[c_id]->_view_list;
+		clients[c_id]->_vl.unlock();
+		
+		//npc 뷰리스트에서 공격체크 
+		for (auto& near_pl : old_vlist) {
+			auto& cpl = clients[near_pl];
+			if (clients[near_pl]->_id > MAX_USER) {
+					switch (clients[c_id]->_dir)
+					{
+					case LEFT:
+						if (clients[near_pl]->_x+1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power; // 체력 -
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
+							cpl->_ll.unlock();
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
 
-		//					if (clients[near_pl]->_hp <= 0) {
-		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
-		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
-		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
-		//							clients[c_id]->_exp = 0;
-		//							clients[c_id]->_level += 1;
-		//						}
-		//					}
-		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
-		//				}
-		//				break;
-		//			case RIGHT:
-		//				if (clients[near_pl]->_x -1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
-		//					clients[near_pl]->_hp -= clients[c_id]->_power;
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
 
-		//					if (clients[near_pl]->_hp <= 0) {
-		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
-		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
-		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
-		//							clients[c_id]->_exp = 0;
-		//							clients[c_id]->_level += 1;
-		//						}
-		//					}
-		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
-		//				}
-		//				break;
-		//			case UP:
-		//				if (clients[near_pl]->_x  == clients[c_id]->_x && clients[near_pl]->_y+1 == clients[c_id]->_y) {
-		//					clients[near_pl]->_hp -= clients[c_id]->_power;
+							// lua_pop(L, 1);// eliminate set_uid from stack after call
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
+					case RIGHT:
+						if (clients[near_pl]->_x -1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power;
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
+							cpl->_ll.unlock();
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
+					case UP:
+						if (clients[near_pl]->_x  == clients[c_id]->_x && clients[near_pl]->_y-1 == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power;
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
+							cpl->_ll.unlock();
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
+					case DOWN:
+						if (clients[near_pl]->_x== clients[c_id]->_x && clients[near_pl]->_y+1 == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power;
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
+							cpl->_ll.unlock();
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
+					}
+					
+				
+			}
+			else { //player to player
+				reinterpret_cast<Player*>(clients[c_id])->send_player_attack_packet(near_pl);
+				reinterpret_cast<Player*>(clients[near_pl])->send_player_attack_packet(c_id);
+			}
+		//	else WakeUpNPC(near_pl, c_id);
 
-		//					if (clients[near_pl]->_hp <= 0) {
-		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
-		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
-		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
-		//							clients[c_id]->_exp = 0;
-		//							clients[c_id]->_level += 1;
-		//						}
-		//					}
-		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
-		//				}
-		//				break;
-		//			case DOWN:
-		//				if (clients[near_pl]->_x== clients[c_id]->_x && clients[near_pl]->_y-1 == clients[c_id]->_y) {
-		//					clients[near_pl]->_hp -= clients[c_id]->_power;
+			/*if (old_vlist.count(near_pl) == 0)
+				clients[c_id]->add_session_packet(near_pl, clients[near_pl]);*/
 
-		//					if (clients[near_pl]->_hp <= 0) {
-		//						reinterpret_cast<Monster*>(clients[near_pl])->_is_die = true;
-		//						clients[c_id]->_exp += clients[near_pl]->_level * 10;
-		//						if (clients[c_id]->_exp > clients[c_id]->_max_exp) { //레벨업
-		//							clients[c_id]->_exp = 0;
-		//							clients[c_id]->_level += 1;
-		//						}
-		//					}
-		//					reinterpret_cast<Player*>(clients[c_id])->send_player_info_packet(c_id);
-		//				}
-		//				break;
-		//			}
-		//			
-		//		}
-		//		
-		//	}
-		//	else { //player to player
-		//		reinterpret_cast<Player*>(clients[c_id])->send_player_attack_packet(near_pl);
-		//		reinterpret_cast<Player*>(clients[near_pl])->send_player_attack_packet(c_id);
-		//	}
-		////	else WakeUpNPC(near_pl, c_id);
-
-		//	/*if (old_vlist.count(near_pl) == 0)
-		//		clients[c_id]->add_session_packet(near_pl, clients[near_pl]);*/
-
-		//}
-		//// 죽었으면 exp 올리고 레벨 올라가면 올리고 30초 후 부활하게 
-		//break;
+		}
+		// 죽었으면 exp 올리고 레벨 올라가면 올리고 30초 후 부활하게 
+		
 	}
+				  break;
 	}
 }
 
@@ -528,6 +522,24 @@ int API_SendMessage(lua_State* L)
 	return 0;
 }
 
+int API_MonsterDie(lua_State* L)
+{
+	cout << "몬스터 죽음" << endl;
+	int user_id = (int)lua_tointeger(L, -2);
+	int exp = (int)lua_tointeger(L, -1);
+
+	lua_pop(L, 2);
+
+	clients[user_id]->_exp += exp;
+	if (clients[user_id]->_exp >= clients[user_id]->_max_exp) { //레벨업
+		clients[user_id]->_exp = 0;
+		clients[user_id]->_level++;
+	}
+	reinterpret_cast<Player*>(clients[user_id])->send_player_info_packet(user_id);
+
+	return 0;
+}
+
 void InitializeNPC()
 {
 	cout << "NPC intialize begin.\n";
@@ -546,7 +558,7 @@ void InitializeNPC()
 
 		auto L = clients[i]->_L = luaL_newstate();
 		luaL_openlibs(L);
-		luaL_loadfile(L, "npc.lua");
+		luaL_loadfile(L, "monster.lua");
 		lua_pcall(L, 0, 0, 0);
 
 		lua_getglobal(L, "set_uid");
@@ -555,6 +567,7 @@ void InitializeNPC()
 		// lua_pop(L, 1);// eliminate set_uid from stack after call
 
 		lua_register(L, "API_SendMessage", API_SendMessage);
+		lua_register(L, "API_MonsterDie", API_MonsterDie);
 		lua_register(L, "API_get_x", API_get_x);
 		lua_register(L, "API_get_y", API_get_y);
 	}

@@ -123,6 +123,7 @@ bool DB::check_id(char* name, short& xPos, short& yPos,short& level,int& hp,int&
             level = user_level;
             hp = user_hp;
             exp = user_exp;
+            
             SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
             return true;
         }
