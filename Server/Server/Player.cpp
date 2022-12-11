@@ -99,7 +99,7 @@ void Player::send_obstacle_pos_packet(Obstacle* _obstacle)
 void Player::send_player_info_packet(int c_id)
 {
 	SC_PLAYERINFO_PACKET p;
-	p.id = _id;
+	p.id = c_id;
 	p.size = sizeof(SC_PLAYERINFO_PACKET);
 	p.type = SC_PLAYERINFO;
 	p.hp = _hp;
@@ -113,7 +113,7 @@ void Player::send_player_info_packet(int c_id)
 void Player::send_player_attack_packet(int c_id)
 {
 	SC_PLAYERATTACK_PACKET p;
-	p.id = _id;
+	p.id = c_id;
 	p.size = sizeof(SC_PLAYERATTACK_PACKET);
 	p.type = SC_PLAYERATTACK;
 

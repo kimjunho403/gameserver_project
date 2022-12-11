@@ -363,8 +363,8 @@ void process_packet(int c_id, char* packet)
 				
 			}
 			else { //player to player
-				reinterpret_cast<Player*>(clients[c_id])->send_player_attack_packet(near_pl);
 				reinterpret_cast<Player*>(clients[near_pl])->send_player_attack_packet(c_id);
+				//reinterpret_cast<Player*>(clients[c_id])->send_player_attack_packet(near_pl);
 			}
 		//	else WakeUpNPC(near_pl, c_id);
 

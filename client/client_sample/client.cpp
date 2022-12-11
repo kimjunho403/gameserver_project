@@ -443,7 +443,6 @@ void ProcessPacket(char* ptr)
 	}
 	case SC_PLAYERINFO:
 	{
-		cout << "ddddfdsf" << endl;
 		SC_PLAYERINFO_PACKET* my_packet = reinterpret_cast<SC_PLAYERINFO_PACKET*>(ptr);
 		int other_id = my_packet->id;
 		if (other_id == g_myid) {
@@ -463,8 +462,14 @@ void ProcessPacket(char* ptr)
 	case SC_PLAYERATTACK:
 	{
 		SC_PLAYERATTACK_PACKET* my_packet = reinterpret_cast<SC_PLAYERATTACK_PACKET*>(ptr);
-
-		players[my_packet->id]->attack();
+		int other_id = my_packet->id;
+		if (other_id == g_myid) {
+			avatar._is_attack = true;
+		}
+		else {
+			players[other_id]->_is_attack = true;
+		}
+		cout << other_id <<" 공격" << endl;
 		break;
 	}
 	default:
@@ -537,11 +542,11 @@ void client_main()
 	}
 
 	avatar.draw();
-	
+	if (avatar._is_attack == true)avatar.attack();
 	
 	for (auto& pl : players) {
-		//cout << pl.second.m_x << "  " << pl.second.m_y << endl;
 		pl.second->draw();
+		if (pl.second->_is_attack == true) { cout << "호출" << endl; pl.second->attack(); }
 	}
 	sf::Text text;
 	text.setFont(g_font);
@@ -568,9 +573,7 @@ void client_main()
 	g_window->draw(rectangle);
 	g_window->draw(text_player_info);
 
-	if (avatar._is_attack == true) {
-		avatar.attack();
-	}
+
 }
 
 void send_packet(void* packet)
