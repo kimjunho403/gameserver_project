@@ -48,6 +48,7 @@ protected:
 	sf::Sprite m_sprite_attack;
 	sf::Text m_name;
 	sf::Text m_chat;
+	sf::Text m_hp_text;
 	sf::Clock clock;
 	sf::Clock attack_clock;
 	sf::IntRect rectSprite;
@@ -69,6 +70,7 @@ public:
 		m_sprite.setTexture(t);
 		rectSprite = sf::IntRect(x, y, x2, y2);
 		m_sprite.setTextureRect(rectSprite);
+		m_hp_text.setFont(g_font);
 		set_name("NONAME");
 		m_mess_end_time = chrono::system_clock::now();
 	}
@@ -80,7 +82,7 @@ public:
 		m_sprite.setTextureRect(rectSprite);
 		set_name("NONAME");
 		m_mess_end_time = chrono::system_clock::now();
-
+		m_hp_text.setFont(g_font);
 		m_sprite_attack = a_t;
 		m_sprite_attack.setScale(0.5f, 0.5f);
 		rectSprite_attack = sf::IntRect(20, 20, 190, 170);
@@ -179,6 +181,15 @@ public:
 		m_name.scale(0.9, 0.9);
 	}
 
+	void set_name_npc(const char str[]) {
+		m_name.setFont(g_font);
+		m_name.setString(str);
+		if (id < MAX_USER) m_name.setFillColor(sf::Color(255, 255, 255));
+		else m_name.setFillColor(sf::Color(255, 255, 0));
+		m_name.setStyle(sf::Text::Bold);
+		m_name.scale(0.9, 0.9);
+	}
+
 	void set_chat(const char str[]) {
 		m_chat.setFont(g_font);
 		m_chat.setString(str);
@@ -186,7 +197,20 @@ public:
 		m_chat.setStyle(sf::Text::Bold);
 		m_mess_end_time = chrono::system_clock::now() + chrono::seconds(3);
 	}
-
+	void set_hp() {
+		sf::RectangleShape rectangle(sf::Vector2f((hp / level*10), 30.0f));
+		rectangle.setFillColor(sf::Color(255, 0, 0));
+		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
+		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
+		rectangle.setPosition(rx, ry-20);
+		g_window->draw(rectangle);
+		char buf[100];
+		sprintf_s(buf, "%d/%d", hp, level * 10);
+		m_hp_text.setPosition(rx, ry - 20);
+		//m_hp_text.scale(0.8f, 0.8f);
+		m_hp_text.setString(buf);
+		g_window->draw(m_hp_text);
+	}
 
 
 	void attack() {
@@ -210,7 +234,6 @@ public:
 
 		if (attack_clock.getElapsedTime().asSeconds() > 0.1f)
 		{
-			cout << rectSprite_attack.top << endl;
 			if (rectSprite_attack.left == 20 + 190 * 4) {
 				rectSprite_attack.left = 20;
 				_is_attack = false;
@@ -250,17 +273,18 @@ public:
 			clock.restart();
 		}
 
-
+		
 		g_window->draw(m_sprite);
 		auto size = m_name.getGlobalBounds();
 		if (m_mess_end_time < chrono::system_clock::now()) {
-			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 10);
+			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 30);
 			g_window->draw(m_name);
 		}
 		else {
-			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 10);
+			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 30);
 			g_window->draw(m_chat);
 		}
+		set_hp();
 	}
 
 	virtual void set_rotate(int _dir) {
@@ -378,15 +402,31 @@ void ProcessPacket(char* ptr)
 		else if (id < MAX_USER) {
 			players[id] = new OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 , *m_sprite };
 			players[id]->id = id;
+			players[id]->hp = my_packet->hp;
+			players[id]->level = my_packet->level;
 			players[id]->move(my_packet->x, my_packet->y);
-			players[id]->set_name(my_packet->name);
+			char str3[128];
+			char str1[] = " ";
+
+			sprintf_s(str3, "LV%d", players[id]->level);
+			strcat_s(str3, str1);
+			strcat_s(str3, my_packet->name);
+			players[id]->set_name(str3);
 			players[id]->show();
 		}
 		else {//NPC
 			players[id] = new Monster{ *bluesnail, 0,40, TILE_WIDTH, TILE_WIDTH };
 			players[id]->id = id;
+			players[id]->hp = my_packet->hp;
+			players[id]->level = my_packet->level;
 			players[id]->move(my_packet->x, my_packet->y);
-			players[id]->set_name(my_packet->name);
+			char str3[128];
+			char str1[] = " ";
+
+			sprintf_s(str3, "LV%d", players[id]->level);
+			strcat_s(str3, str1);
+			strcat_s(str3, my_packet->name);
+			players[id]->set_name(str3);
 			players[id]->show();
 		}
 		break;
@@ -469,7 +509,6 @@ void ProcessPacket(char* ptr)
 		else {
 			players[other_id]->_is_attack = true;
 		}
-		cout << other_id <<" 공격" << endl;
 		break;
 	}
 	default:
@@ -546,7 +585,8 @@ void client_main()
 	
 	for (auto& pl : players) {
 		pl.second->draw();
-		if (pl.second->_is_attack == true) { cout << "호출" << endl; pl.second->attack(); }
+		
+		if (pl.second->_is_attack == true) { pl.second->attack(); }
 	}
 	sf::Text text;
 	text.setFont(g_font);
@@ -566,7 +606,11 @@ void client_main()
 	sprintf_s(buf, "\n HP %d / %d", avatar.hp, avatar.hp * 10);
 	text_player_info.setFillColor(sf::Color(255, 255, 255));
 	text_player_info.setString(buf);
-
+	g_window->draw(text_player_info);
+	buf[0] = '\0';
+	sprintf_s(buf, "\n\n POWER %d ", avatar.level *5);
+	text_player_info.setFillColor(sf::Color(0, 255, 0));
+	text_player_info.setString(buf);
 	sf::RectangleShape rectangle(sf::Vector2f(128.0f * (10.0f / 100.0f), 30.0f));
 	rectangle.setFillColor(sf::Color(255, 0, 0));
 	rectangle.setPosition(10, 40);

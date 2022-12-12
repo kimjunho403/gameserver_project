@@ -88,6 +88,8 @@ struct SC_ADD_OBJECT_PACKET {
 	int		id;
 	short	x, y;
 	char	name[NAME_SIZE];
+	int		hp;
+	int		level;
 };
 
 struct SC_REMOVE_OBJECT_PACKET {

@@ -546,14 +546,6 @@ void InitializeNPC()
 
 	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
 		clients[i] = new Monster;
-		clients[i]->_x = rand() % W_WIDTH;
-		clients[i]->_y = rand() % W_HEIGHT;
-		clients[i]->_level =1+ rand() % 20;
-		clients[i]->_hp = 10 * clients[i]->_level;
-		clients[i]->_power = clients[i]->_level * 5;
-		
-		clients[i]->_id = i;
-		sprintf_s(clients[i]->_name, "NPC%d", i);
 		clients[i]->_state = ST_INGAME;
 
 		auto L = clients[i]->_L = luaL_newstate();
@@ -564,6 +556,28 @@ void InitializeNPC()
 		lua_getglobal(L, "set_uid");
 		lua_pushnumber(L, i);
 		lua_pcall(L, 1, 0, 0);
+
+		lua_getglobal(L, "get_info");
+		lua_pcall(L, 0, 8, 0);
+		int myid = (int)lua_tointeger(L, -8);
+		char* name = (char*)lua_tostring(L, -7);
+		int level = (int)lua_tointeger(L, -6);
+		int hp = (int)lua_tointeger(L, -5);
+		int power = (int)lua_tointeger(L, -4);
+		int exp = (int)lua_tointeger(L, -3);
+		int x = (int)lua_tointeger(L, -2);
+		int y = (int)lua_tointeger(L, -1);
+		lua_pop(L, 8);
+
+		clients[i]->_x = x;
+		clients[i]->_y = y;
+		clients[i]->_level = level;
+		clients[i]->_hp = hp;
+		clients[i]->_power = power;
+
+		clients[i]->_id = i;
+		strcpy_s(clients[i]->_name, name);
+
 		// lua_pop(L, 1);// eliminate set_uid from stack after call
 
 		lua_register(L, "API_SendMessage", API_SendMessage);

@@ -1,13 +1,19 @@
-math.randomseed(os.time())
+math.randomseed()
 
+name = "bluesnail"
 myid = 99999;
 level = math.random(10)
-hp = 10
+hp = 10* level
 power = level *10
 exp = level*5
-
+x = math.random(2000)
+y = math.random(2000)
 function set_uid(x)
    myid = x;
+end
+
+function get_info()
+   return myid, name, level, hp, power, exp, x, y
 end
 
 function set_hp(x,player)

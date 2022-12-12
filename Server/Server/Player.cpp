@@ -60,6 +60,8 @@ void Player::add_session_packet(int c_id, SESSION* clients)
 	add_packet.type = SC_ADD_OBJECT;
 	add_packet.x = clients->_x;
 	add_packet.y = clients->_y;
+	add_packet.hp = clients->_hp;
+	add_packet.level = clients->_level;
 	_vl.lock();
 	_view_list.insert(c_id);
 	_vl.unlock();
