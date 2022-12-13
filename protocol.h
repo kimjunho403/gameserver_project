@@ -34,6 +34,7 @@ constexpr char SC_STAT_CHANGE = 9;
 constexpr char SC_OBSTACLE = 10;
 constexpr char SC_PLAYERINFO = 11;
 constexpr char SC_PLAYERATTACK = 12;
+constexpr char SC_MONSTERHP = 13;
 #pragma pack (push, 1)
 
 struct CS_LOGIN_PACKET {
@@ -157,5 +158,11 @@ struct SC_PLAYERATTACK_PACKET {
 	char	type;
 	int		id;
 	
+};
+struct SC_MONSTER_HP_PACKET {
+	unsigned char size;
+	char	type;
+	int		id;
+	int		hp;
 };
 #pragma pack (pop)

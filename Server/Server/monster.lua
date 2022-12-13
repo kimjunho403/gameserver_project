@@ -5,7 +5,7 @@ myid = 99999;
 level = math.random(10)
 hp = 10* level
 power = level *10
-exp = level*5
+exp = level*2
 x = math.random(2000)
 y = math.random(2000)
 function set_uid(x)
@@ -16,10 +16,16 @@ function get_info()
    return myid, name, level, hp, power, exp, x, y
 end
 
+function getrespawn()
+   return hp,x, y
+end
+
 function set_hp(x,player)
    hp =hp - x;
+   API_MonsterHit(myid,hp);
    if(hp <=0) then
-       API_MonsterDie(player,exp);
+       API_MonsterDie(myid,player,exp);
+       hp= 10* level
    end
 end
 

@@ -2,7 +2,7 @@
 #include "Session.h"
 #include "Obstacle.h"
 
-enum EVENT_TYPE { EV_RANDOM_MOVE };
+enum EVENT_TYPE { EV_RANDOM_MOVE, EV_RESPAWN};
 
 struct TIMER_EVENT {
 	int obj_id;
@@ -29,6 +29,7 @@ public:
 	virtual void send_login_info_packet() override;
 	virtual void add_session_packet(int c_id, SESSION* clients) override;
 	virtual void send_remove_session_packet(int c_id) override;
+	
 
 };
 

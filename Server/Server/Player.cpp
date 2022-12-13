@@ -121,3 +121,13 @@ void Player::send_player_attack_packet(int c_id)
 
 	do_send(&p);
 }
+
+void Player::send_monster_hp_packet(int c_id, int hp)
+{
+	SC_MONSTER_HP_PACKET p;
+	p.id = c_id;
+	p.size = sizeof(SC_MONSTER_HP_PACKET);
+	p.type = SC_MONSTERHP;
+	p.hp = hp;
+	do_send(&p);
+}

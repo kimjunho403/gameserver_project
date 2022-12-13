@@ -456,6 +456,7 @@ void ProcessPacket(char* ptr)
 			avatar.hide();
 		}
 		else {
+			cout << "È£ÃâµÆ¾î¿ë" << endl;
 			players.erase(other_id);
 		}
 		break;
@@ -509,6 +510,13 @@ void ProcessPacket(char* ptr)
 		else {
 			players[other_id]->_is_attack = true;
 		}
+		break;
+	}
+	case SC_MONSTERHP:
+	{
+		SC_MONSTER_HP_PACKET* my_packet = reinterpret_cast<SC_MONSTER_HP_PACKET*>(ptr);
+		players[my_packet->id]->hp = my_packet->hp;
+		
 		break;
 	}
 	default:
@@ -603,18 +611,21 @@ void client_main()
 	text_player_info.setString(buf);
 	g_window->draw(text_player_info);
 	buf[0] = '\0';
-	sprintf_s(buf, "\n HP %d / %d", avatar.hp, avatar.hp * 10);
+	sprintf_s(buf, "\n HP %d / %d", avatar.hp, avatar.level * 10);
 	text_player_info.setFillColor(sf::Color(255, 255, 255));
 	text_player_info.setString(buf);
+
+	sf::RectangleShape rectangle(sf::Vector2f(10.0f * ((float)avatar.hp / (float)avatar.level * 10), 30.0f));
+	rectangle.setFillColor(sf::Color(255, 0, 0));
+	rectangle.setPosition(10, 40);
+	g_window->draw(rectangle);
+
 	g_window->draw(text_player_info);
 	buf[0] = '\0';
 	sprintf_s(buf, "\n\n POWER %d ", avatar.level *5);
 	text_player_info.setFillColor(sf::Color(0, 255, 0));
 	text_player_info.setString(buf);
-	sf::RectangleShape rectangle(sf::Vector2f(128.0f * (10.0f / 100.0f), 30.0f));
-	rectangle.setFillColor(sf::Color(255, 0, 0));
-	rectangle.setPosition(10, 40);
-	g_window->draw(rectangle);
+
 	g_window->draw(text_player_info);
 
 
@@ -664,27 +675,29 @@ int main()
 			if (event.type == sf::Event::KeyPressed) {
 				int direction = -1;
 				bool attack = false;
-				switch (event.key.code) {
-				case sf::Keyboard::Left:
-					direction = 2;
+				if (!avatar._is_attack) {
+					switch (event.key.code) {
+					case sf::Keyboard::Left:
+						direction = 2;
 
-					break;
-				case sf::Keyboard::Right:
-					direction = 3;
-					break;
-				case sf::Keyboard::Up:
-					direction = 0;
-					break;
-				case sf::Keyboard::Down:
-					direction = 1;
-					break;
-				case sf::Keyboard::Escape:
-					window.close();
-					break;
-				case sf::Keyboard::A:
-					attack = true;
-					avatar._is_attack = true;
-					break;
+						break;
+					case sf::Keyboard::Right:
+						direction = 3;
+						break;
+					case sf::Keyboard::Up:
+						direction = 0;
+						break;
+					case sf::Keyboard::Down:
+						direction = 1;
+						break;
+					case sf::Keyboard::Escape:
+						window.close();
+						break;
+					case sf::Keyboard::A:
+						attack = true;
+						avatar._is_attack = true;
+						break;
+					}
 				}
 				if (-1 != direction) {
 					CS_MOVE_PACKET p;

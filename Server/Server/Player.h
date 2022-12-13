@@ -14,6 +14,7 @@ public:
 	void send_obstacle_pos_packet( Obstacle* _obstacle);
 	void send_player_info_packet(int c_id);
 	void send_player_attack_packet(int c_id);
+	void send_monster_hp_packet(int c_id, int hp);
 };
 
 
