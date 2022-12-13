@@ -615,7 +615,7 @@ void client_main()
 	text_player_info.setFillColor(sf::Color(255, 255, 255));
 	text_player_info.setString(buf);
 
-	sf::RectangleShape rectangle(sf::Vector2f(10.0f * ((float)avatar.hp / (float)avatar.level * 10), 30.0f));
+	sf::RectangleShape rectangle(sf::Vector2f(3.0f * ((float)avatar.hp / (float)avatar.level * 10), 30.0f));
 	rectangle.setFillColor(sf::Color(255, 0, 0));
 	rectangle.setPosition(10, 40);
 	g_window->draw(rectangle);

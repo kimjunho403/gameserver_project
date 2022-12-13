@@ -18,7 +18,7 @@ public:
 	virtual void send_login_info_packet() override;
 	virtual void add_session_packet(int c_id, SESSION* clients) override;
 	virtual void send_remove_session_packet(int c_id) override;
-	
+	void chase_move(SESSION* client);
 
 };
 

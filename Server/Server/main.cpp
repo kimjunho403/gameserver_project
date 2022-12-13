@@ -7,7 +7,7 @@
 #include "DB.h"
 #include <random>
 
-enum EVENT_TYPE { EV_RANDOM_MOVE, EV_RESPAWN, EV_HPUP };
+enum EVENT_TYPE { EV_RANDOM_MOVE, EV_RESPAWN, EV_HPUP, EV_CHASE };
 
 struct TIMER_EVENT {
 	int obj_id;
@@ -132,6 +132,62 @@ void do_npc_random_move(int npc_id)
 		if (true == can_see(npc._id, obj->_id))
 			old_vl.insert(obj->_id);
 	}
+
+	//int x = npc._x;
+	//int y = npc._y;
+	//switch (rand() % 4) {
+	//case 0: if (x < (W_WIDTH - 1)) x++; break;
+	//case 1: if (x > 0) x--; break;
+	//case 2: if (y < (W_HEIGHT - 1)) y++; break;
+	//case 3:if (y > 0) y--; break;
+	//}
+	//npc._x = x;
+	//npc._y = y;
+
+	unordered_set<int> new_vl;
+	for (auto& obj : clients) {//좌표 변환후 뷰 리스트에 유저 추가
+		if (ST_INGAME != obj->_state) continue;
+		if (true == obj->_id > MAX_USER) continue;
+		if (true == can_see(npc._id, obj->_id))
+			new_vl.insert(obj->_id);
+	}
+
+	for (auto pl : new_vl) {
+		if (0 == old_vl.count(pl)) {
+			// 플레이어의 시야에 등장
+			clients[pl]->add_session_packet(npc._id, clients[npc._id]);
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			clients[pl]->send_move_packet(npc._id, clients[npc._id], clients[npc._id]->last_movetime);
+		}
+	}
+	///시야에 있었다가 사라짐
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			clients[pl]->_vl.lock();
+			if (0 != clients[pl]->_view_list.count(npc._id)) {
+				clients[pl]->_vl.unlock();
+				clients[pl]->send_remove_session_packet(npc._id);
+			}
+			else {
+				clients[pl]->_vl.unlock();
+			}
+		}
+	}
+}
+
+void do_ai_chase_move(int ai_id,int target_id)
+{
+	SESSION& npc = *clients[ai_id];
+	unordered_set<int> old_vl;
+	for (auto& obj : clients) {//npc기준 시야에 닿는 유저 뷰리스트에 유저 추가
+		if (ST_INGAME != obj->_state) continue;
+		if (true == obj->_id > MAX_USER) continue;
+		if (true == can_see(npc._id, obj->_id))
+			old_vl.insert(obj->_id);
+	}
+	reinterpret_cast<Monster*>(&npc)->chase_move(clients[target_id]);
 
 	//int x = npc._x;
 	//int y = npc._y;
@@ -396,8 +452,7 @@ void process_packet(int c_id, char* packet)
 					clients[c_id]->add_session_packet(near_pl, clients[near_pl]);*/
 
 		}
-		// 죽었으면 exp 올리고 레벨 올라가면 올리고 30초 후 부활하게 
-
+	
 	}
 				  break;
 	}
@@ -544,6 +599,29 @@ void worker_thread(HANDLE h_iocp) {
 			delete ex_over;
 		}
 						   break;
+		case OP_CHASE : {
+			bool keep_alive = false;
+			for (int j = 0; j < MAX_USER; ++j) {//계속 누군가의 시야에 있다면 keep_alive를 true로
+				if (clients[j]->_state != ST_INGAME) continue;
+				if (can_see(static_cast<int>(key), j)) {
+					keep_alive = true;
+					break;
+				}
+			}
+
+			if (true == keep_alive) {
+				do_ai_chase_move(key,ex_over->_ai_target_obj);
+				
+				//do_npc_random_move(static_cast<int>(key));
+				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_CHASE, 0 };
+				timer_queue.push(ev);
+			}
+			else {
+				reinterpret_cast<Monster*>(clients[key])->_is_active = false;
+			}
+			delete ex_over;
+		}
+						   break;
 
 		}
 
@@ -622,7 +700,8 @@ int API_MonsterDie(lua_State* L)
 int API_MonsterHit(lua_State* L)
 {
 	cout << "몬스터 맞음" << endl;
-	int c_id = (int)lua_tointeger(L, -2);
+	int c_id = (int)lua_tointeger(L, -3);
+	int user_id = (int)lua_tointeger(L, -2);
 	int hp = (int)lua_tointeger(L, -1);
 
 	lua_pop(L, 2);
@@ -635,6 +714,8 @@ int API_MonsterHit(lua_State* L)
 		}
 	}
 
+	TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 1s, EV_CHASE, user_id };//플레이어 따라가라
+	timer_queue.push(ev);
 
 	return 0;
 }
@@ -692,8 +773,9 @@ void do_timer()
 	while (true) {
 		TIMER_EVENT ev;
 		auto current_time = chrono::system_clock::now();
+		
 		if (true == timer_queue.try_pop(ev)) {
-			if (ev.wakeup_time > current_time) {
+			if (ev.wakeup_time > current_time) {//아직 실행시간이 안됐다면
 				timer_queue.push(ev);		// 최적화 필요
 				// timer_queue에 다시 넣지 않고 처리해야 한다.
 				this_thread::sleep_for(1ms);  // 실행시간이 아직 안되었으므로 잠시 대기
@@ -719,6 +801,15 @@ void do_timer()
 			{
 				OVER_EXP* ov = new OVER_EXP;
 				ov->_comp_type = OP_PLAYER_HPUP;
+				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
+
+				break;
+			}
+			case EV_CHASE:
+			{
+				OVER_EXP* ov = new OVER_EXP;
+				ov->_comp_type = OP_CHASE;
+				ov->_ai_target_obj = ev.target_id;
 				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
 
 				break;

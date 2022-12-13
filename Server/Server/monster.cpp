@@ -64,17 +64,27 @@ void Monster::send_remove_session_packet(int c_id)
 	do_send(&p);
 }
 
-//int API_SendMessage(lua_State* L)
-//{
-//	int my_id = (int)lua_tointeger(L, -3);
-//	int user_id = (int)lua_tointeger(L, -2);
-//	char* mess = (char*)lua_tostring(L, -1);
-//
-//	lua_pop(L, 4);
-//
-//	
-//	return 0;
-//}
+void Monster::chase_move(SESSION* client)
+{
+
+	if (_x < client->_x) {
+		_x++;
+	}
+	else if(_x > client->_x) {
+		_x--;
+	}
+	else if (_y < client->_y) {
+		_y++;
+	}
+	else if (_y > client->_y) {
+		_y--;
+	}
+
+}
+
+
+
+
 
 
 
