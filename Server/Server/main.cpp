@@ -7,12 +7,25 @@
 #include "DB.h"
 #include <random>
 
+enum EVENT_TYPE { EV_RANDOM_MOVE, EV_RESPAWN, EV_HPUP };
+
+struct TIMER_EVENT {
+	int obj_id;
+	chrono::system_clock::time_point wakeup_time;
+	EVENT_TYPE event_id;
+	int target_id;
+	constexpr bool operator < (const TIMER_EVENT& L) const
+	{
+		return (wakeup_time > L.wakeup_time);
+	}
+};
+
 concurrency::concurrent_priority_queue<TIMER_EVENT> timer_queue;
 
 OVER_EXP g_a_over;//accept용 오버랩드 구조체 얘는 data rece가 아님 
 //동시에 2개의 오버랩드가 완료될리가 없음 
 SOCKET g_c_SOCKET;
-SOCKET g_s_SOCKET; 
+SOCKET g_s_SOCKET;
 
 
 HANDLE h_iocp;
@@ -29,7 +42,7 @@ void init_obstacle() {
 		_ob._x = rand() % 2000;
 		_ob._y = rand() % 2000;
 		i++;
-		
+
 	}
 }
 bool is_collision(SESSION* player, short dir) {
@@ -41,14 +54,14 @@ bool is_collision(SESSION* player, short dir) {
 				return true;
 			}
 		}
-			break;
+		break;
 	case RIGHT:
 		for (auto& _ob : obsatcles) {
 			if (_ob._x == player->_x + 1 && _ob._y == player->_y) {
 				return true;
 			}
 		}
-			break;
+		break;
 	case UP:
 		for (auto& _ob : obsatcles) {
 			if (_ob._x == player->_x && _ob._y == player->_y + 1) {
@@ -142,7 +155,7 @@ void do_npc_random_move(int npc_id)
 	for (auto pl : new_vl) {
 		if (0 == old_vl.count(pl)) {
 			// 플레이어의 시야에 등장
-			clients[pl]->add_session_packet(npc._id,clients[npc._id]);
+			clients[pl]->add_session_packet(npc._id, clients[npc._id]);
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
@@ -192,7 +205,7 @@ void process_packet(int c_id, char* packet)
 			lock_guard<mutex> ll{ clients[c_id]->_s_lock };
 			clients[c_id]->_x = rand() % W_WIDTH;
 			clients[c_id]->_y = rand() % W_HEIGHT;
-			cout << clients[c_id]->_x <<"        " << clients[c_id]->_y << endl;
+			cout << clients[c_id]->_x << "        " << clients[c_id]->_y << endl;
 		}
 #else
 		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))
@@ -202,7 +215,7 @@ void process_packet(int c_id, char* packet)
 		}
 		else { clients[c_id]->_power = clients[c_id]->_level * 5; };
 
-		cout << clients[c_id]->_x <<"   " << clients[c_id]->_y << endl;
+		cout << clients[c_id]->_x << "   " << clients[c_id]->_y << endl;
 #endif
 		{
 			lock_guard<mutex> ll(clients[c_id]->_s_lock);
@@ -225,7 +238,15 @@ void process_packet(int c_id, char* packet)
 		for (auto& ob : obsatcles) {
 			static_cast<Player*>(clients[c_id])->send_obstacle_pos_packet(&ob);
 		}
-		
+
+		OVER_EXP* exover = new OVER_EXP;
+		exover->_comp_type = OP_PLAYER_HPUP;
+		PostQueuedCompletionStatus(h_iocp, 1, c_id, &exover->_over);
+
+
+		TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 5s, EV_RANDOM_MOVE, 0 };
+		timer_queue.push(ev);
+
 		break;
 	}
 	case CS_MOVE: {
@@ -242,7 +263,7 @@ void process_packet(int c_id, char* packet)
 			case RIGHT: if (x < W_WIDTH - 1) x++; clients[c_id]->_dir = RIGHT; break;
 			}
 
-			}
+		}
 
 		clients[c_id]->_x = x;
 		clients[c_id]->_y = y;
@@ -255,7 +276,7 @@ void process_packet(int c_id, char* packet)
 			if (ST_INGAME != cl->_state) continue;
 			if (cl->_id == c_id) continue;
 			if (can_see(c_id, cl->_id)) near_list.insert(cl->_id);
-			
+
 		}
 		clients[c_id]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
 
@@ -276,16 +297,16 @@ void process_packet(int c_id, char* packet)
 			}
 			else WakeUpNPC(near_pl, c_id);
 
-				if (old_vlist.count(near_pl) == 0)
-					clients[c_id]->add_session_packet(near_pl, clients[near_pl]);
-			
+			if (old_vlist.count(near_pl) == 0)
+				clients[c_id]->add_session_packet(near_pl, clients[near_pl]);
+
 		}
 		//viewlist에서 사라졌다면 remove 패킷 전달 
 		for (auto& index : old_vlist) {
 			if (0 == near_list.count(index)) {
 				clients[c_id]->send_remove_session_packet(index);
 				clients[index]->send_remove_session_packet(c_id);
-		}
+			}
 
 		}
 		break;
@@ -296,87 +317,87 @@ void process_packet(int c_id, char* packet)
 		clients[c_id]->_vl.lock();
 		unordered_set<int> old_vlist = clients[c_id]->_view_list;
 		clients[c_id]->_vl.unlock();
-		
+
 		//npc 뷰리스트에서 공격체크 
 		for (auto& near_pl : old_vlist) {
 			auto& cpl = clients[near_pl];
 			if (clients[near_pl]->_id > MAX_USER) {
-					switch (clients[c_id]->_dir)
-					{
-					case LEFT:
-						if (clients[near_pl]->_x+1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
-							//clients[near_pl]->_hp -= clients[c_id]->_power; // 체력 -
-							cpl->_ll.lock();
-							lua_getglobal(clients[near_pl]->_L, "set_hp");
-							
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+				switch (clients[c_id]->_dir)
+				{
+				case LEFT:
+					if (clients[near_pl]->_x + 1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+						//clients[near_pl]->_hp -= clients[c_id]->_power; // 체력 -
+						cpl->_ll.lock();
+						lua_getglobal(clients[near_pl]->_L, "set_hp");
 
-							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-							cpl->_ll.unlock();
-							// lua_pop(L, 1);// eliminate set_uid from stack after call
-							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
-						}
-						break;
-					case RIGHT:
-						if (clients[near_pl]->_x -1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
-							//clients[near_pl]->_hp -= clients[c_id]->_power;
-							cpl->_ll.lock();
-							lua_getglobal(clients[near_pl]->_L, "set_hp");
-							
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
-							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-							cpl->_ll.unlock();
-							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
-						}
-						break;
-					case UP:
-						if (clients[near_pl]->_x  == clients[c_id]->_x && clients[near_pl]->_y-1 == clients[c_id]->_y) {
-							//clients[near_pl]->_hp -= clients[c_id]->_power;
-							cpl->_ll.lock();
-							lua_getglobal(clients[near_pl]->_L, "set_hp");
-							
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
-							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-							cpl->_ll.unlock();
-							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
-						}
-						break;
-					case DOWN:
-						if (clients[near_pl]->_x== clients[c_id]->_x && clients[near_pl]->_y+1 == clients[c_id]->_y) {
-							//clients[near_pl]->_hp -= clients[c_id]->_power;
-							cpl->_ll.lock();
-							lua_getglobal(clients[near_pl]->_L, "set_hp");
-						
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
-							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-							cpl->_ll.unlock();
-							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
-						}
-						break;
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+
+						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+						cpl->_ll.unlock();
+						// lua_pop(L, 1);// eliminate set_uid from stack after call
+						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
 					}
-					
-				
+					break;
+				case RIGHT:
+					if (clients[near_pl]->_x - 1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+						//clients[near_pl]->_hp -= clients[c_id]->_power;
+						cpl->_ll.lock();
+						lua_getglobal(clients[near_pl]->_L, "set_hp");
+
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+						cpl->_ll.unlock();
+						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+					}
+					break;
+				case UP:
+					if (clients[near_pl]->_x == clients[c_id]->_x && clients[near_pl]->_y - 1 == clients[c_id]->_y) {
+						//clients[near_pl]->_hp -= clients[c_id]->_power;
+						cpl->_ll.lock();
+						lua_getglobal(clients[near_pl]->_L, "set_hp");
+
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+						cpl->_ll.unlock();
+						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+					}
+					break;
+				case DOWN:
+					if (clients[near_pl]->_x == clients[c_id]->_x && clients[near_pl]->_y + 1 == clients[c_id]->_y) {
+						//clients[near_pl]->_hp -= clients[c_id]->_power;
+						cpl->_ll.lock();
+						lua_getglobal(clients[near_pl]->_L, "set_hp");
+
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+						cpl->_ll.unlock();
+						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+					}
+					break;
+				}
+
+
 			}
 			else { //player to player
 				reinterpret_cast<Player*>(clients[near_pl])->send_player_attack_packet(c_id);
 				//reinterpret_cast<Player*>(clients[c_id])->send_player_attack_packet(near_pl);
 			}
-		//	else WakeUpNPC(near_pl, c_id);
+			//	else WakeUpNPC(near_pl, c_id);
 
-			/*if (old_vlist.count(near_pl) == 0)
-				clients[c_id]->add_session_packet(near_pl, clients[near_pl]);*/
+				/*if (old_vlist.count(near_pl) == 0)
+					clients[c_id]->add_session_packet(near_pl, clients[near_pl]);*/
 
 		}
 		// 죽었으면 exp 올리고 레벨 올라가면 올리고 30초 후 부활하게 
-		
+
 	}
 				  break;
 	}
@@ -423,7 +444,7 @@ void worker_thread(HANDLE h_iocp) {
 					lock_guard<mutex> ll(clients[client_id]->_s_lock);
 					clients[client_id]->_state = ST_ALLOC;
 				}
-				
+
 				clients[client_id]->_id = client_id;
 				clients[client_id]->_prev_remain = 0;
 				clients[client_id]->_socket = g_c_SOCKET;
@@ -497,7 +518,6 @@ void worker_thread(HANDLE h_iocp) {
 			clients[key]->_x = x;
 			clients[key]->_y = y;
 			clients[key]->_hp = hp;
-			cout << clients[key]->_x << " ==   " << clients[key]->_y << endl;
 			//시야에 들어오는 플레이어에게 보여주기 
 			for (int j = 0; j < MAX_USER; ++j) {
 				if (clients[j]->_state != ST_INGAME) continue;
@@ -505,10 +525,25 @@ void worker_thread(HANDLE h_iocp) {
 					clients[j]->add_session_packet(static_cast<int>(key), clients[key]);
 				}
 			}
-			
+
 			delete ex_over;
 		}
-						break;
+						   break;
+
+		case OP_PLAYER_HPUP: {
+			if (clients[key]->_level * 10 > clients[key]->_hp)
+				clients[key]->_hp += clients[key]->_level;
+			else
+				clients[key]->_hp = clients[key]->_level * 10;
+
+			reinterpret_cast<Player*>(clients[key])->send_player_info_packet(key);
+			//시야에 들어오는 플레이어에게 보여주기 
+			TIMER_EVENT ev{ key, chrono::system_clock::now() + 5s, EV_HPUP, 0 };
+			timer_queue.push(ev);
+
+			delete ex_over;
+		}
+						   break;
 
 		}
 
@@ -516,7 +551,7 @@ void worker_thread(HANDLE h_iocp) {
 }
 
 void InitiallizePlayer() {
-	for (int i = 0; i < MAX_USER ; ++i) {
+	for (int i = 0; i < MAX_USER; ++i) {
 		clients[i] = new Player;
 	}
 }
@@ -571,7 +606,6 @@ int API_MonsterDie(lua_State* L)
 	//다른 유저한테 얘 죽었다고 알려줘야됨
 	for (int i = 0; i < MAX_USER; ++i) {
 		if (can_see(moster_id, i)) {
-			cout << i << "얘한테서 안보이게 해야징" << endl;
 			reinterpret_cast<Player*>(clients[i])->send_remove_session_packet(moster_id);
 		}
 	}
@@ -597,7 +631,6 @@ int API_MonsterHit(lua_State* L)
 
 	for (int i = 0; i < MAX_USER; ++i) {
 		if (can_see(c_id, i)) {
-			cout << hp << endl;
 			reinterpret_cast<Player*>(clients[i])->send_monster_hp_packet(c_id, hp);
 		}
 	}
@@ -673,14 +706,21 @@ void do_timer()
 				ov->_comp_type = OP_NPC_MOVE;
 				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
 			}
-				break;
+			break;
 			case EV_RESPAWN:
 			{
 				OVER_EXP* ov = new OVER_EXP;
 				ov->_comp_type = OP_NPC_RESPAWN;
 				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
 
-				cout << "지옥에서 부활했다 예수처럼 이렇게" << endl;
+				break;
+			}
+			case EV_HPUP:
+			{
+				OVER_EXP* ov = new OVER_EXP;
+				ov->_comp_type = OP_PLAYER_HPUP;
+				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
+
 				break;
 			}
 			}

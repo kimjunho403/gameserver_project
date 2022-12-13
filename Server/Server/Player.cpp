@@ -131,3 +131,5 @@ void Player::send_monster_hp_packet(int c_id, int hp)
 	p.hp = hp;
 	do_send(&p);
 }
+
+

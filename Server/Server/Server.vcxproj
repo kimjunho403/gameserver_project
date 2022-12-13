@@ -141,7 +141,6 @@
     <ClInclude Include="global.h" />
     <ClInclude Include="monster.h" />
     <ClInclude Include="Obstacle.h" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Over_exp.h" />
     <ClInclude Include="Session.h" />
