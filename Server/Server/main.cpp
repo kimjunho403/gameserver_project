@@ -36,14 +36,26 @@ DB User_DB;
 
 
 void init_obstacle() {
+	cout << "obstacle init" << endl;
 	int i = 0;
-	for (auto& _ob : obsatcles) {
-		_ob._id = i;
-		_ob._x = rand() % 2000;
-		_ob._y = rand() % 2000;
-		i++;
-
+	for (int x = 500; x < 1500; x++) {
+		for (int y = 500; y < 1500; y++) {
+			if (rand() % 50 == 1 && i <= MAX_OBSTACLE) {
+				obsatcles[i]._id = i;
+				obsatcles[i]._x = x;
+				obsatcles[i]._y = y;
+				i++;
+			}
+		}
 	}
+	cout << "obstacle init end" << endl;
+	//for (auto& _ob : obsatcles) {
+	//	_ob._id = i;
+	//	_ob._x = rand() % 2000;
+	//	_ob._y = rand() % 2000;
+	//	i++;
+
+	//}
 }
 bool is_collision(SESSION* player, short dir) {
 	switch (dir)
@@ -587,10 +599,10 @@ void worker_thread(HANDLE h_iocp) {
 						   break;
 
 		case OP_PLAYER_HPUP: {
-			if (clients[key]->_level * 10 > clients[key]->_hp)
+			if (clients[key]->_level * 100 > clients[key]->_hp)
 				clients[key]->_hp += clients[key]->_level;
 			else
-				clients[key]->_hp = clients[key]->_level * 10;
+				clients[key]->_hp = clients[key]->_level * 100;
 
 			reinterpret_cast<Player*>(clients[key])->send_player_info_packet(key);
 			//시야에 들어오는 플레이어에게 보여주기 
@@ -744,7 +756,13 @@ int API_attack(lua_State* L)
 	lua_pop(L, 2);
 
 	clients[plyaer_id]->_hp -= clients[monster_id]->_level*5;
-
+	if (clients[plyaer_id]->_hp <= 0)//죽음
+	{
+		clients[plyaer_id]->_exp /= 2;
+		clients[plyaer_id]->_x = 1000;
+		clients[plyaer_id]->_y = 1000;
+		clients[plyaer_id]->_hp = clients[plyaer_id]->_level * 100;
+	}
 	
 	reinterpret_cast<Player*>(clients[plyaer_id])->send_player_info_packet(plyaer_id);
 	

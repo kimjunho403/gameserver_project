@@ -456,7 +456,6 @@ void ProcessPacket(char* ptr)
 			avatar.hide();
 		}
 		else {
-			cout << "È£ÃâµÆ¾î¿ë" << endl;
 			players.erase(other_id);
 		}
 		break;
@@ -611,14 +610,19 @@ void client_main()
 	text_player_info.setString(buf);
 	g_window->draw(text_player_info);
 	buf[0] = '\0';
-	sprintf_s(buf, "\n HP %d / %d", avatar.hp, avatar.level * 10);
+	sprintf_s(buf, "\n HP %d / %d", avatar.hp, avatar.level * 100);
 	text_player_info.setFillColor(sf::Color(255, 255, 255));
 	text_player_info.setString(buf);
 
-	sf::RectangleShape rectangle(sf::Vector2f(3.0f * ((float)avatar.hp / (float)avatar.level * 10), 30.0f));
+	sf::RectangleShape rectangle(sf::Vector2f(250.0f * ((float)avatar.hp / ((float)avatar.level * 100)), 30.0f));
 	rectangle.setFillColor(sf::Color(255, 0, 0));
 	rectangle.setPosition(10, 40);
 	g_window->draw(rectangle);
+
+	sf::RectangleShape rectangle_e(sf::Vector2f(250.0f*(float)avatar.exp / ((float)avatar.level * 100), 30.0f));
+	rectangle_e.setFillColor(sf::Color(125, 125, 0));
+	rectangle_e.setPosition(10, 110);
+	g_window->draw(rectangle_e);
 
 	g_window->draw(text_player_info);
 	buf[0] = '\0';
@@ -627,7 +631,12 @@ void client_main()
 	text_player_info.setString(buf);
 
 	g_window->draw(text_player_info);
+	buf[0] = '\0';
+	sprintf_s(buf, "\n\n\n EXP %d / %d", avatar.exp, avatar.level * 100);
+	text_player_info.setFillColor(sf::Color(255, 255, 255));
+	text_player_info.setString(buf);
 
+	g_window->draw(text_player_info);
 
 }
 
