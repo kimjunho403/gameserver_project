@@ -269,7 +269,8 @@ void process_packet(int c_id, char* packet)
 			clients[c_id]->_x = -1;
 			//실패했을때
 		}
-		else { clients[c_id]->_power = clients[c_id]->_level * 5; };
+		else { clients[c_id]->_power = clients[c_id]->_level * 5;
+		      clients[c_id]->_max_exp = clients[c_id]->_level * 100; };
 
 		cout << clients[c_id]->_x << "   " << clients[c_id]->_y << endl;
 #endif
@@ -619,6 +620,16 @@ void worker_thread(HANDLE h_iocp) {
 			else {
 				reinterpret_cast<Monster*>(clients[key])->_is_active = false;
 			}
+
+			//여기 스크립트 공격 event
+			clients[key]->_ll.lock();
+			lua_getglobal(clients[key]->_L, "event_attack");
+			lua_pushnumber(clients[key]->_L, ex_over->_ai_target_obj);
+			if (lua_pcall(clients[key]->_L, 1, 0, 0))
+				printf("Error calling lua function: %s\n", lua_tostring(clients[key]->_L, -1));
+
+			clients[key]->_ll.unlock();
+
 			delete ex_over;
 		}
 						   break;
@@ -676,9 +687,13 @@ int API_MonsterDie(lua_State* L)
 	lua_pop(L, 3);
 
 	clients[user_id]->_exp += exp;
-	if (clients[user_id]->_exp >= clients[user_id]->_max_exp) { //경험치 업 
+
+	if (clients[user_id]->_exp >= clients[user_id]->_max_exp) { //레벨 업 
 		clients[user_id]->_exp = 0;
+		
 		clients[user_id]->_level++;
+		clients[user_id]->_max_exp = clients[user_id]->_level * 100;
+		clients[user_id]->_power = clients[user_id]->_level * 5;
 	}
 	reinterpret_cast<Player*>(clients[user_id])->send_player_info_packet(user_id);// 경험치 받은 플레이어 정보 전달 
 	//다른 유저한테 얘 죽었다고 알려줘야됨
@@ -704,7 +719,7 @@ int API_MonsterHit(lua_State* L)
 	int user_id = (int)lua_tointeger(L, -2);
 	int hp = (int)lua_tointeger(L, -1);
 
-	lua_pop(L, 2);
+	lua_pop(L, 3);
 
 	clients[c_id]->_hp = hp;
 
@@ -716,6 +731,26 @@ int API_MonsterHit(lua_State* L)
 
 	TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 1s, EV_CHASE, user_id };//플레이어 따라가라
 	timer_queue.push(ev);
+
+	return 0;
+}
+
+int API_attack(lua_State* L)
+{
+	cout << "몬스터 공격" << endl;
+	int monster_id = (int)lua_tointeger(L, -2);
+	int plyaer_id = (int)lua_tointeger(L, -1);
+
+	lua_pop(L, 2);
+
+	clients[plyaer_id]->_hp -= clients[monster_id]->_level*5;
+
+	
+	reinterpret_cast<Player*>(clients[plyaer_id])->send_player_info_packet(plyaer_id);
+	
+
+	//TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 1s, EV_CHASE, user_id };//플레이어 따라가라
+	//timer_queue.push(ev);
 
 	return 0;
 }
@@ -758,8 +793,7 @@ void InitializeNPC()
 		strcpy_s(clients[i]->_name, name);
 
 		// lua_pop(L, 1);// eliminate set_uid from stack after call
-
-		lua_register(L, "API_SendMessage", API_SendMessage);
+		lua_register(L, "API_attack", API_attack);
 		lua_register(L, "API_MonsterDie", API_MonsterDie);
 		lua_register(L, "API_MonsterHit", API_MonsterHit);
 		lua_register(L, "API_get_x", API_get_x);

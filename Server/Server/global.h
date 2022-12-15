@@ -11,6 +11,7 @@
 #include<string>
 #include<atomic>
 #include <concurrent_priority_queue.h>
+#include <queue>
 #include "../../protocol.h"
 
 extern "C"
