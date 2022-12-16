@@ -38,6 +38,7 @@ int g_top_y;
 int g_myid;
 sf::RenderWindow* g_window;
 sf::Font g_font;
+void send_packet(void* packet);
 
 class OBJECT {
 
@@ -358,6 +359,12 @@ void client_initialize()
 void client_finish()
 {
 	players.clear();
+
+	//CS_LOGOUT_PACKET p;
+	//p.size = sizeof(p);
+	//p.type = CS_LOGOUT;
+	//send_packet(&p);
+
 	delete board;
 	delete pieces;
 	delete rock;
@@ -481,20 +488,14 @@ void ProcessPacket(char* ptr)
 		trees[my_packet->id].show();
 		break;
 	}
-	case SC_PLAYERINFO:
+	case SC_STAT_CHANGE:
 	{
-		SC_PLAYERINFO_PACKET* my_packet = reinterpret_cast<SC_PLAYERINFO_PACKET*>(ptr);
-		int other_id = my_packet->id;
-		if (other_id == g_myid) {
+		SC_STAT_CHANGEL_PACKET* my_packet = reinterpret_cast<SC_STAT_CHANGEL_PACKET*>(ptr);
+		
 			avatar.hp = my_packet->hp;
+			avatar.max_hp = my_packet->max_hp;
 			avatar.exp = my_packet->exp;
 			avatar.level = my_packet->level;
-		}
-		else {
-			players[other_id]->hp = my_packet->hp;
-			players[other_id]->exp = my_packet->exp;
-			players[other_id]->level = my_packet->level;
-		}
 		
 
 		break;
@@ -560,6 +561,10 @@ void client_main()
 		while (true);
 	}
 	if (recv_result == sf::Socket::Disconnected) {
+		CS_LOGOUT_PACKET p;
+		p.size = sizeof(p);
+		p.type = CS_LOGOUT;
+		send_packet(&p);
 		wcout << L"Disconnected\n";
 		exit(-1);
 	}

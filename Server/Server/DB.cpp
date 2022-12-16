@@ -132,3 +132,35 @@ bool DB::check_id(char* name, short& xPos, short& yPos,short& level,int& hp,int&
     return false;
 
 }
+
+bool DB::add_user(char* name, short& xPos, short& yPos, short& level, int& hp, int& exp)
+{
+    wstring qu{};
+    qu += L"EXEC add_newuser ";
+
+    wstring tmp{};
+    tmp.assign(&name[0], &name[sizeof(name)]);
+    qu += tmp;
+    //SQLWCHAR szName[NAME_LEN];
+    //SQLINTEGER user_xPos, user_yPos, user_level, user_hp, user_exp;
+    //SQLLEN cbxPos = 0, cbyPos = 0, cb_id = 0, cb_level = 0, cb_hp = 0, cb_exp = 0;
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)qu.c_str(), SQL_NTS);
+
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+
+        if (retcode == SQL_ERROR)
+            show_error(hstmt, SQL_HANDLE_STMT, retcode);
+
+        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
+            SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+
+        return true;
+
+    }
+    else {
+        show_error(hstmt, SQL_HANDLE_STMT, retcode);
+    }
+    return false;
+}

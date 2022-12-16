@@ -51,6 +51,15 @@ void Player::send_login_info_packet()
 	do_send(&p);
 }
 
+void Player::send_login_fail_packet()
+{
+	SC_LOGIN_FAIL_PACKET p;
+	p.size = sizeof(SC_LOGIN_FAIL_PACKET);
+	p.type = SC_LOGIN_FAIL;
+
+	do_send(&p);
+}
+
 void Player::add_session_packet(int c_id, SESSION* clients)
 {
 	SC_ADD_OBJECT_PACKET add_packet;
@@ -98,14 +107,13 @@ void Player::send_obstacle_pos_packet(Obstacle* _obstacle)
 	do_send(&p);
 }
 
-void Player::send_player_info_packet(int c_id)
+void Player::send_stat_changel_packet()
 {
-	SC_PLAYERINFO_PACKET p;
-	p.id = c_id;
-	p.size = sizeof(SC_PLAYERINFO_PACKET);
-	p.type = SC_PLAYERINFO;
+	SC_STAT_CHANGEL_PACKET p;
+	p.size = sizeof(SC_STAT_CHANGEL_PACKET);
+	p.type = SC_STAT_CHANGE;
 	p.hp = _hp;
-	p.max_hp = _hp;
+	p.max_hp = _level * 10;
 	p.exp = _exp;
 	p.level = _level;
 

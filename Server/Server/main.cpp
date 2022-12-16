@@ -265,9 +265,20 @@ void process_packet(int c_id, char* packet)
 	switch (packet[1]) {
 	case CS_LOGIN: {
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
+		//이미 로그인 한 플레이어인지 체크 
+		for (auto& cl : clients) {
+			if (0 == strcmp(cl->_name, p->name) && cl->_state == ST_INGAME) {
+				reinterpret_cast<Player*>(clients[c_id])->send_login_fail_packet();
+				disconnect(c_id);
+				return;
+		}
+			if (cl->_id > MAX_USER) break;
+			
+			
+		}
+
 		strcpy_s(clients[c_id/*얘가 로그인한걸 알려줌*/]->_name, p->name);
 
-		//만약 db에 없는 아이디 이면 실패
 #ifdef STRESS_TEST
 		{
 			lock_guard<mutex> ll{ clients[c_id]->_s_lock };
@@ -276,13 +287,20 @@ void process_packet(int c_id, char* packet)
 			cout << clients[c_id]->_x << "        " << clients[c_id]->_y << endl;
 		}
 #else
-		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))
+	
+
+		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))//없는 아이디 
 		{
-			clients[c_id]->_x = -1;
-			//실패했을때
+			User_DB.add_user(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp);
+			User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp);
+			clients[c_id]->_power = clients[c_id]->_level * 5;
+			clients[c_id]->_max_exp = clients[c_id]->_level * 100; ;
 		}
-		else { clients[c_id]->_power = clients[c_id]->_level * 5;
-		      clients[c_id]->_max_exp = clients[c_id]->_level * 100; };
+		else {
+			clients[c_id]->_power = clients[c_id]->_level * 5;
+			clients[c_id]->_max_exp = clients[c_id]->_level * 100; ;
+
+		}
 
 		cout << clients[c_id]->_x << "   " << clients[c_id]->_y << endl;
 #endif
@@ -315,6 +333,12 @@ void process_packet(int c_id, char* packet)
 
 		TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 5s, EV_RANDOM_MOVE, 0 };
 		timer_queue.push(ev);
+
+		break;
+	}
+	case CS_LOGOUT:
+	{
+		disconnect(c_id);
 
 		break;
 	}
@@ -604,7 +628,7 @@ void worker_thread(HANDLE h_iocp) {
 			else
 				clients[key]->_hp = clients[key]->_level * 100;
 
-			reinterpret_cast<Player*>(clients[key])->send_player_info_packet(key);
+			reinterpret_cast<Player*>(clients[key])->send_stat_changel_packet();
 			//시야에 들어오는 플레이어에게 보여주기 
 			TIMER_EVENT ev{ key, chrono::system_clock::now() + 5s, EV_HPUP, 0 };
 			timer_queue.push(ev);
@@ -707,7 +731,7 @@ int API_MonsterDie(lua_State* L)
 		clients[user_id]->_max_exp = clients[user_id]->_level * 100;
 		clients[user_id]->_power = clients[user_id]->_level * 5;
 	}
-	reinterpret_cast<Player*>(clients[user_id])->send_player_info_packet(user_id);// 경험치 받은 플레이어 정보 전달 
+	reinterpret_cast<Player*>(clients[user_id])->send_stat_changel_packet();// 경험치 받은 플레이어 정보 전달 
 	//다른 유저한테 얘 죽었다고 알려줘야됨
 	for (int i = 0; i < MAX_USER; ++i) {
 		if (can_see(moster_id, i)) {
@@ -764,7 +788,7 @@ int API_attack(lua_State* L)
 		clients[plyaer_id]->_hp = clients[plyaer_id]->_level * 100;
 	}
 	
-	reinterpret_cast<Player*>(clients[plyaer_id])->send_player_info_packet(plyaer_id);
+	reinterpret_cast<Player*>(clients[plyaer_id])->send_stat_changel_packet();
 	
 
 	//TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 1s, EV_CHASE, user_id };//플레이어 따라가라
@@ -822,11 +846,13 @@ void InitializeNPC()
 
 void do_timer()
 {
+
 	while (true) {
 		TIMER_EVENT ev;
 		auto current_time = chrono::system_clock::now();
 		
 		if (true == timer_queue.try_pop(ev)) {
+
 			if (ev.wakeup_time > current_time) {//아직 실행시간이 안됐다면
 				timer_queue.push(ev);		// 최적화 필요
 				// timer_queue에 다시 넣지 않고 처리해야 한다.
