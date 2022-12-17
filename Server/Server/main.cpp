@@ -98,6 +98,7 @@ bool can_see(int c1, int c2)
 
 }
 
+
 int get_new_client_id()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
@@ -145,16 +146,16 @@ void do_npc_random_move(int npc_id)
 			old_vl.insert(obj->_id);
 	}
 
-	//int x = npc._x;
-	//int y = npc._y;
-	//switch (rand() % 4) {
-	//case 0: if (x < (W_WIDTH - 1)) x++; break;
-	//case 1: if (x > 0) x--; break;
-	//case 2: if (y < (W_HEIGHT - 1)) y++; break;
-	//case 3:if (y > 0) y--; break;
-	//}
-	//npc._x = x;
-	//npc._y = y;
+	int x = npc._x;
+	int y = npc._y;
+	switch (rand() % 4) {
+	case 0: if (x < (W_WIDTH - 1) && x < reinterpret_cast<Monster&>(npc).scape_x ) x++; break;
+	case 1: if (x > 0 && x > reinterpret_cast<Monster&>(npc).scape_x - 40) x--; break;
+	case 2: if (y < (W_HEIGHT - 1) && y < reinterpret_cast<Monster&>(npc).scape_y ) y++; break;
+	case 3:if (y > 0 && y > reinterpret_cast<Monster&>(npc).scape_y-40) y--; break;
+	}
+	npc._x = x;
+	npc._y = y;
 
 	unordered_set<int> new_vl;
 	for (auto& obj : clients) {//좌표 변환후 뷰 리스트에 유저 추가
@@ -247,17 +248,24 @@ void do_ai_chase_move(int ai_id,int target_id)
 
 void WakeUpNPC(int npc_id, int waker)
 {
-	OVER_EXP* exover = new OVER_EXP;
-	exover->_comp_type = OP_AI_HELLO;
-	exover->_ai_target_obj = waker;
-	PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->_over);
-
+	if (reinterpret_cast<Monster*>(clients[npc_id])->_current_state != CST_CHASE) {
+		OVER_EXP* exover = new OVER_EXP;
+		exover->_comp_type = OP_AI_NEAR_CHECK;
+		exover->_ai_target_obj = waker;
+		PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->_over);
+	}
 	if (reinterpret_cast<Monster*>(clients[npc_id])->_is_active) return;
+
 	bool old_state = false;
+
 	if (false == atomic_compare_exchange_strong(&reinterpret_cast<Monster*>(clients[npc_id])->_is_active, &old_state, true))
 		return;
-	TIMER_EVENT ev{ npc_id, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
-	timer_queue.push(ev);
+
+	if (reinterpret_cast<Monster*>(clients[npc_id])->_type ==TY_WANDER && reinterpret_cast<Monster*>(clients[npc_id])->_current_state == CST_PEACE) {
+		TIMER_EVENT ev{ npc_id, chrono::system_clock::now()+ 1s, EV_RANDOM_MOVE, 0 };
+		timer_queue.push(ev);
+	}
+
 }
 
 void process_packet(int c_id, char* packet)
@@ -284,15 +292,20 @@ void process_packet(int c_id, char* packet)
 			lock_guard<mutex> ll{ clients[c_id]->_s_lock };
 			clients[c_id]->_x = rand() % W_WIDTH;
 			clients[c_id]->_y = rand() % W_HEIGHT;
-			cout << clients[c_id]->_x << "        " << clients[c_id]->_y << endl;
 		}
 #else
 	
 
-		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))//없는 아이디 
+		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))//없는 아이디라면
 		{
-			User_DB.add_user(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp);
+			if (!User_DB.add_user(clients[c_id]->_name)) {
+				reinterpret_cast<Player*>(clients[c_id])->send_login_fail_packet();
+				disconnect(c_id);
+				return;
+			}
+
 			User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp);
+
 			clients[c_id]->_power = clients[c_id]->_level * 5;
 			clients[c_id]->_max_exp = clients[c_id]->_level * 100; ;
 		}
@@ -331,8 +344,8 @@ void process_packet(int c_id, char* packet)
 		PostQueuedCompletionStatus(h_iocp, 1, c_id, &exover->_over);
 
 
-		TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 5s, EV_RANDOM_MOVE, 0 };
-		timer_queue.push(ev);
+		/*TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 5s, EV_RANDOM_MOVE, 0 };
+		timer_queue.push(ev);*/
 
 		break;
 	}
@@ -371,6 +384,7 @@ void process_packet(int c_id, char* packet)
 			if (can_see(c_id, cl->_id)) near_list.insert(cl->_id);
 
 		}
+
 		clients[c_id]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
 
 		//다른애들한테 내 정보 전달 
@@ -584,10 +598,11 @@ void worker_thread(HANDLE h_iocp) {
 					break;
 				}
 			}
-			if (true == keep_alive) {
+			if (true == keep_alive && reinterpret_cast<Monster*>(clients[key])->_current_state ==CST_PEACE) {
 				do_npc_random_move(static_cast<int>(key));
 				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
 				timer_queue.push(ev);
+
 			}
 			else {
 				reinterpret_cast<Monster*>(clients[key])->_is_active = false;
@@ -595,7 +610,26 @@ void worker_thread(HANDLE h_iocp) {
 			delete ex_over;
 		}
 						break;
+		case OP_AI_NEAR_CHECK: {
+			clients[key]->_ll.lock();
+			auto L = clients[key]->_L;
+			lua_getglobal(L, "event_player_move");
+			lua_pushnumber(L, ex_over->_ai_target_obj);
+			lua_pcall(L, 1, 1, 0);
+			//여기서 근처에 있는지 체크 1이면 영역 안에 들어옴
+			bool check = (int)lua_tointeger(L, -1);
+			lua_pop(L, 2);
+			clients[key]->_ll.unlock();
+			if (check == 1) {
+				reinterpret_cast<Monster*>(clients[key])->_current_state = CST_CHASE;
 
+				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_CHASE, ex_over->_ai_target_obj };
+				timer_queue.push(ev);
+			}
+
+			delete ex_over;
+		}
+							 break;
 		case OP_NPC_RESPAWN: {
 			clients[key]->_ll.lock();
 			auto L = clients[key]->_L;
@@ -655,6 +689,7 @@ void worker_thread(HANDLE h_iocp) {
 			}
 			else {
 				reinterpret_cast<Monster*>(clients[key])->_is_active = false;
+				reinterpret_cast<Monster*>(clients[key])->_current_state = CST_PEACE;
 			}
 
 			//여기 스크립트 공격 event
@@ -764,10 +799,12 @@ int API_MonsterHit(lua_State* L)
 			reinterpret_cast<Player*>(clients[i])->send_monster_hp_packet(c_id, hp);
 		}
 	}
+	if (reinterpret_cast<Monster*>(clients[c_id])->_current_state != CST_CHASE) {
+		reinterpret_cast<Monster*>(clients[c_id])->_current_state = CST_CHASE;
+		TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 1s, EV_CHASE, user_id };//플레이어 따라가라
+		timer_queue.push(ev);
 
-	TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 1s, EV_CHASE, user_id };//플레이어 따라가라
-	timer_queue.push(ev);
-
+	}
 	return 0;
 }
 
@@ -786,6 +823,51 @@ int API_attack(lua_State* L)
 		clients[plyaer_id]->_x = 1000;
 		clients[plyaer_id]->_y = 1000;
 		clients[plyaer_id]->_hp = clients[plyaer_id]->_level * 100;
+		clients[plyaer_id]->_view_list.clear();
+
+
+		unordered_set<int> near_list;
+		clients[plyaer_id]->_vl.lock();
+		unordered_set<int> old_vlist = clients[plyaer_id]->_view_list;
+		clients[plyaer_id]->_vl.unlock();
+		for (auto& cl : clients) {
+			if (ST_INGAME != cl->_state) continue;
+			if (cl->_id == plyaer_id) continue;
+			if (can_see(plyaer_id, cl->_id)) near_list.insert(cl->_id);
+
+		}
+
+		clients[plyaer_id]->send_move_packet(plyaer_id, clients[plyaer_id], clients[plyaer_id]->last_movetime);
+
+		//다른애들한테 내 정보 전달 
+		for (auto& near_pl : near_list) {
+			auto& cpl = clients[near_pl];
+			if (clients[near_pl]->_id < MAX_USER) {
+				cpl->_vl.lock();
+				if (clients[near_pl]->_view_list.count(plyaer_id)) {
+					cpl->_vl.unlock();
+					clients[near_pl]->send_move_packet(plyaer_id, clients[plyaer_id], clients[plyaer_id]->last_movetime);
+				}
+				else
+				{
+					cpl->_vl.unlock();
+					clients[near_pl]->add_session_packet(plyaer_id, clients[plyaer_id]);
+				}
+			}
+			else WakeUpNPC(near_pl, plyaer_id);
+
+			if (old_vlist.count(near_pl) == 0)
+				clients[plyaer_id]->add_session_packet(near_pl, clients[near_pl]);
+
+		}
+		//viewlist에서 사라졌다면 remove 패킷 전달 
+		for (auto& index : old_vlist) {
+			if (0 == near_list.count(index)) {
+				clients[plyaer_id]->send_remove_session_packet(index);
+				clients[index]->send_remove_session_packet(plyaer_id);
+			}
+
+		}
 	}
 	
 	reinterpret_cast<Player*>(clients[plyaer_id])->send_stat_changel_packet();
@@ -806,40 +888,85 @@ void InitializeNPC()
 
 		auto L = clients[i]->_L = luaL_newstate();
 		luaL_openlibs(L);
-		luaL_loadfile(L, "monster.lua");
-		lua_pcall(L, 0, 0, 0);
+		if (rand() % 2 == 0) { //파란달팽이
+			luaL_loadfile(L, "monster.lua");
+			lua_pcall(L, 0, 0, 0);
 
-		lua_getglobal(L, "set_uid");
-		lua_pushnumber(L, i);
-		lua_pcall(L, 1, 0, 0);
+			lua_getglobal(L, "set_uid");
+			lua_pushnumber(L, i);
+			lua_pcall(L, 1, 0, 0);
 
-		lua_getglobal(L, "get_info");
-		lua_pcall(L, 0, 8, 0);
-		int myid = (int)lua_tointeger(L, -8);
-		char* name = (char*)lua_tostring(L, -7);
-		int level = (int)lua_tointeger(L, -6);
-		int hp = (int)lua_tointeger(L, -5);
-		int power = (int)lua_tointeger(L, -4);
-		int exp = (int)lua_tointeger(L, -3);
-		int x = (int)lua_tointeger(L, -2);
-		int y = (int)lua_tointeger(L, -1);
-		lua_pop(L, 8);
+			lua_getglobal(L, "get_info");
+			lua_pcall(L, 0, 8, 0);
+			int myid = (int)lua_tointeger(L, -8);
+			char* name = (char*)lua_tostring(L, -7);
+			int level = (int)lua_tointeger(L, -6);
+			int hp = (int)lua_tointeger(L, -5);
+			int power = (int)lua_tointeger(L, -4);
+			int exp = (int)lua_tointeger(L, -3);
+			int x = (int)lua_tointeger(L, -2);
+			int y = (int)lua_tointeger(L, -1);
+			lua_pop(L, 8);
 
-		clients[i]->_x = x;
-		clients[i]->_y = y;
-		clients[i]->_level = level;
-		clients[i]->_hp = hp;
-		clients[i]->_power = power;
+			clients[i]->_x = x;
+			clients[i]->_y = y;
+			clients[i]->_level = level;
+			clients[i]->_hp = hp;
+			clients[i]->_power = power;
+			clients[i]->_id = i;
 
-		clients[i]->_id = i;
-		strcpy_s(clients[i]->_name, name);
+			reinterpret_cast<Monster*>(clients[i])->_type = TY_PEACE;
+			reinterpret_cast<Monster*>(clients[i])->_current_state = CST_PEACE;
+			strcpy_s(clients[i]->_name, name);
 
-		// lua_pop(L, 1);// eliminate set_uid from stack after call
-		lua_register(L, "API_attack", API_attack);
-		lua_register(L, "API_MonsterDie", API_MonsterDie);
-		lua_register(L, "API_MonsterHit", API_MonsterHit);
-		lua_register(L, "API_get_x", API_get_x);
-		lua_register(L, "API_get_y", API_get_y);
+			// lua_pop(L, 1);// eliminate set_uid from stack after call
+			lua_register(L, "API_attack", API_attack);
+			lua_register(L, "API_MonsterDie", API_MonsterDie);
+			lua_register(L, "API_MonsterHit", API_MonsterHit);
+			lua_register(L, "API_get_x", API_get_x);
+			lua_register(L, "API_get_y", API_get_y);
+		}
+		else {//뿔버섯
+			luaL_loadfile(L, "monster2.lua");
+			lua_pcall(L, 0, 0, 0);
+
+			lua_getglobal(L, "set_uid");
+			lua_pushnumber(L, i);
+			lua_pcall(L, 1, 0, 0);
+
+			lua_getglobal(L, "get_info");
+			lua_pcall(L, 0, 8, 0);
+			int myid = (int)lua_tointeger(L, -8);
+			char* name = (char*)lua_tostring(L, -7);
+			int level = (int)lua_tointeger(L, -6);
+			int hp = (int)lua_tointeger(L, -5);
+			int power = (int)lua_tointeger(L, -4);
+			int exp = (int)lua_tointeger(L, -3);
+			int x = (int)lua_tointeger(L, -2);
+			int y = (int)lua_tointeger(L, -1);
+			lua_pop(L, 8);
+
+			clients[i]->_x = x;
+			clients[i]->_y = y;
+			clients[i]->_level = level;
+			clients[i]->_hp = hp;
+			clients[i]->_power = power;
+			clients[i]->_id = i;
+			reinterpret_cast<Monster*>(clients[i])->scape_x = x + 20;
+			reinterpret_cast<Monster*>(clients[i])->scape_y = y + 20;
+			reinterpret_cast<Monster*>(clients[i])->_type = TY_WANDER;
+			reinterpret_cast<Monster*>(clients[i])->_current_state = CST_PEACE;
+			strcpy_s(clients[i]->_name, name);
+
+			// lua_pop(L, 1);// eliminate set_uid from stack after call
+			lua_register(L, "API_attack", API_attack);
+			lua_register(L, "API_MonsterDie", API_MonsterDie);
+			lua_register(L, "API_MonsterHit", API_MonsterHit);
+			lua_register(L, "API_get_x", API_get_x);
+			lua_register(L, "API_get_y", API_get_y);
+
+		
+		}
 	}
 	cout << "NPC initialize end.\n";
 }
@@ -852,7 +979,6 @@ void do_timer()
 		auto current_time = chrono::system_clock::now();
 		
 		if (true == timer_queue.try_pop(ev)) {
-
 			if (ev.wakeup_time > current_time) {//아직 실행시간이 안됐다면
 				timer_queue.push(ev);		// 최적화 필요
 				// timer_queue에 다시 넣지 않고 처리해야 한다.

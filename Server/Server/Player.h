@@ -16,6 +16,7 @@ public:
 	void send_stat_changel_packet();
 	void send_player_attack_packet(int c_id);
 	void send_monster_hp_packet(int c_id, int hp);
+
 };
 
 

@@ -133,7 +133,7 @@ bool DB::check_id(char* name, short& xPos, short& yPos,short& level,int& hp,int&
 
 }
 
-bool DB::add_user(char* name, short& xPos, short& yPos, short& level, int& hp, int& exp)
+bool DB::add_user(char* name)
 {
     wstring qu{};
     qu += L"EXEC add_newuser ";

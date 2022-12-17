@@ -163,6 +163,11 @@ void ProcessPacket(int ci, unsigned char packet[])
 	case SC_ADD_OBJECT: break;//무시
 	case SC_REMOVE_OBJECT: break;//무시
 	case SC_OBSTACLE: break;
+	case SC_PLAYERATTACK: break;
+	case SC_MONSTERHP: break;
+	case SC_STAT_CHANGE: break;
+	case SC_LOGIN_FAIL: break;
+
 	case SC_LOGIN_INFO:
 	{
 		g_clients[ci].connected = true;

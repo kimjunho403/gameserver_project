@@ -255,8 +255,9 @@ public:
 };
 
 class Monster :public OBJECT {
+	float sprite_gap;
 public:
-	Monster(sf::Texture& t, int x, int y, int x2, int y2) :OBJECT(t, x, y, x2, y2) {};
+	Monster(sf::Texture& t, int x, int y, int x2, int y2,float _sprite_gap) :OBJECT(t, x, y, x2, y2), sprite_gap(_sprite_gap) {};
 	~Monster() {};
 	virtual void draw() {
 		if (false == m_showing) return;
@@ -265,10 +266,10 @@ public:
 		m_sprite.setPosition(rx, ry);
 		if (clock.getElapsedTime().asSeconds() > 0.3f)
 		{
-			if (rectSprite.left == 50 * 3)
+			if (rectSprite.left == sprite_gap * 3)
 				rectSprite.left = 0;
 			else
-				rectSprite.left += 50;
+				rectSprite.left += sprite_gap;
 
 			m_sprite.setTextureRect(rectSprite);
 			clock.restart();
@@ -278,11 +279,11 @@ public:
 		g_window->draw(m_sprite);
 		auto size = m_name.getGlobalBounds();
 		if (m_mess_end_time < chrono::system_clock::now()) {
-			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 30);
+			m_name.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 50);
 			g_window->draw(m_name);
 		}
 		else {
-			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 30);
+			m_chat.setPosition(rx + 32 - size.width / 2, ry - size.width / 2 + 50);
 			g_window->draw(m_chat);
 		}
 		set_hp();
@@ -307,6 +308,7 @@ public:
 
 };
 
+
 OBJECT avatar;
 unordered_map <int, OBJECT*> players;
 
@@ -318,6 +320,7 @@ sf::Texture* board;
 sf::Texture* pieces;
 sf::Texture* rock;
 sf::Texture* bluesnail;
+sf::Texture* Mushroom;
 sf::Texture* attack_t;
 sf::Sprite* m_sprite;
 void client_initialize()
@@ -326,6 +329,7 @@ void client_initialize()
 	pieces = new sf::Texture;
 	rock = new sf::Texture;
 	bluesnail = new sf::Texture;
+	Mushroom = new sf::Texture;
 	attack_t = new sf::Texture;
 	m_sprite = new sf::Sprite;
 
@@ -333,6 +337,7 @@ void client_initialize()
 	pieces->loadFromFile("player.png");
 	rock->loadFromFile("rock.png");
 	bluesnail->loadFromFile("Monster1.png");
+	Mushroom->loadFromFile("Monster2.png");
 	attack_t->loadFromFile("attack.png");
 
 
@@ -360,15 +365,12 @@ void client_finish()
 {
 	players.clear();
 
-	//CS_LOGOUT_PACKET p;
-	//p.size = sizeof(p);
-	//p.type = CS_LOGOUT;
-	//send_packet(&p);
 
 	delete board;
 	delete pieces;
 	delete rock;
 	delete bluesnail;
+	delete Mushroom;
 	delete attack_t;
 	delete m_sprite;
 }
@@ -422,7 +424,12 @@ void ProcessPacket(char* ptr)
 			players[id]->show();
 		}
 		else {//NPC
-			players[id] = new Monster{ *bluesnail, 0,40, TILE_WIDTH, TILE_WIDTH };
+
+			if(strcmp(my_packet->name,"Horny Mushroom") == 0)
+				players[id] = new Monster{ *Mushroom, 0,55, 58, 55, 58};
+			else if (strcmp(my_packet->name, "bluesnail") == 0)
+				players[id] = new Monster{ *bluesnail, 0,40, TILE_WIDTH, TILE_WIDTH ,50};
+
 			players[id]->id = id;
 			players[id]->hp = my_packet->hp;
 			players[id]->level = my_packet->level;
