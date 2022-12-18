@@ -708,7 +708,9 @@ void worker_thread(HANDLE h_iocp) {
 			else {
 				cout << "버프 비활성화" << endl;
 				clients[key]->_power = clients[key]->_level *5;
-				reinterpret_cast<Player*>(clients[key])->send_stat_changel_packet();
+				if (clients[key]->_state == ST_INGAME) {
+					reinterpret_cast<Player*>(clients[key])->send_stat_changel_packet();
+				}
 				reinterpret_cast<Player*>(clients[key])->_is_buff = false;
 				delete ex_over;
 			}

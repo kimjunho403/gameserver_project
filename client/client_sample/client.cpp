@@ -5,7 +5,7 @@
 #include <chrono>
 #include <unordered_map>
 using namespace std;
-
+using namespace chrono;
 #ifdef _DEBUG
 #pragma comment (lib, "lib/sfml-graphics-s-d.lib")
 #pragma comment (lib, "lib/sfml-window-s-d.lib")
@@ -57,8 +57,8 @@ protected:
 	sf::IntRect rectSprite;
 	sf::IntRect rectSprite_attack;
 	sf::IntRect rectSprite_attack_2;
-	chrono::system_clock::time_point buff_time;
 	chrono::system_clock::time_point m_mess_end_time;
+	
 public:
 	bool _is_attack;
 	bool _is_buff;
@@ -72,6 +72,7 @@ public:
 	short dir;
 	int power;
 	short attack_type;
+	chrono::system_clock::time_point buff_time;
 	chrono::system_clock::time_point move_time;
 	OBJECT(sf::Texture& t, int x, int y, int x2, int y2) {
 		m_showing = false;
@@ -107,9 +108,8 @@ public:
 	bool do_buff() {
 
 		if (!_is_buff) {
-			
-			buff_time = chrono::system_clock::now();
 			_is_buff = true;
+			buff_time = chrono::system_clock::now();
 			return true;
 		}
 		return false;
@@ -657,7 +657,7 @@ void client_main()
 	}
 
 	avatar.draw();
-	if (avatar._is_attack == true)avatar.attack();
+	
 	
 	for (auto& pl : players) {
 		pl.second->draw();
@@ -717,6 +717,33 @@ void client_main()
 	
 	skill_3.a_move(rx+200, ry);
 	skill_3.a_draw();
+
+	if (avatar._is_attack == true) {
+		for (int i = 0; i < 2; i++) {
+			float rx = (avatar.m_x - g_left_x) * 55 + 8 + i*100;
+			float ry = (avatar.m_y - g_top_y) * 55 + 250;
+			sf::RectangleShape rectangle(sf::Vector2f(50.0f, 50.0f));
+			rectangle.setFillColor(sf::Color(128, 128, 128, 100));
+			rectangle.setPosition(rx, ry);
+		
+			g_window->draw(rectangle);
+		}
+		avatar.attack();
+	}
+	if (avatar._is_buff == true) {
+		if (avatar.buff_time + 10s < chrono::system_clock::now()) {
+			avatar._is_buff = false;
+		}
+		else {
+			float rx = (avatar.m_x - g_left_x) * 55 + 8 + 200;
+			float ry = (avatar.m_y - g_top_y) * 55 + 250;
+			sf::RectangleShape rectangle(sf::Vector2f(50.0f, 50.0f));
+			rectangle.setFillColor(sf::Color(128, 128, 128, 100));
+			rectangle.setPosition(rx, ry);
+			g_window->draw(rectangle);
+		}
+	}
+
 }
 
 void send_packet(void* packet)
