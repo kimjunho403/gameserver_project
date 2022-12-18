@@ -2,6 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
 #include <iostream>
+#include <queue>
 #include <chrono>
 #include <unordered_map>
 using namespace std;
@@ -39,6 +40,8 @@ int g_myid;
 sf::RenderWindow* g_window;
 sf::Font g_font;
 void send_packet(void* packet);
+char c_buf[6][64];
+int c_enter=0;
 
 class OBJECT {
 
@@ -502,6 +505,8 @@ void ProcessPacket(char* ptr)
 	}
 	case SC_MOVE_OBJECT:
 	{
+	
+
 		SC_MOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
 		int other_id = my_packet->id;
 		if (other_id == g_myid) {
@@ -533,12 +538,15 @@ void ProcessPacket(char* ptr)
 	{
 		SC_CHAT_PACKET* my_packet = reinterpret_cast<SC_CHAT_PACKET*>(ptr);
 		int other_id = my_packet->id;
-		if (other_id == g_myid) {
-			avatar.set_chat(my_packet->mess);
+		
+
+		for (int i = 3; i >= 0; --i) {
+			strcpy_s(c_buf[i + 1], c_buf[i]);
 		}
-		else {
-			players[other_id]->set_chat(my_packet->mess);
-		}
+
+		strcpy_s(c_buf[0], my_packet->mess);
+		if(c_enter < 6)
+		c_enter++;
 
 		break;
 	}
@@ -581,6 +589,7 @@ void ProcessPacket(char* ptr)
 		SC_MONSTER_HP_PACKET* my_packet = reinterpret_cast<SC_MONSTER_HP_PACKET*>(ptr);
 		players[my_packet->id]->hp = my_packet->hp;
 		
+
 		break;
 	}
 	default:
@@ -743,6 +752,20 @@ void client_main()
 			g_window->draw(rectangle);
 		}
 	}
+
+	sf::RectangleShape rectangle_t(sf::Vector2f(450.0f, 300.0f));
+	rectangle_t.setFillColor(sf::Color(128, 128, 128, 100));
+	rectangle_t.setPosition(0, WINDOW_HEIGHT - 300);
+	g_window->draw(rectangle_t);
+
+	text.setScale(0.7f, 0.7f);
+	for (int i = 0; i < c_enter; i++) {
+		text.setPosition(0, WINDOW_HEIGHT - 100 - 30*i);
+		text.setString(c_buf[i]);
+	
+		g_window->draw(text);
+	}
+
 
 }
 
