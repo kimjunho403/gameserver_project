@@ -140,4 +140,14 @@ void Player::send_monster_hp_packet(int c_id, int hp)
 	do_send(&p);
 }
 
+void Player::send_chat_packet(int c_id, const char* mess)
+{
+	SC_CHAT_PACKET p;
+	p.id = c_id;
+	p.size = sizeof(SC_CHAT_PACKET);
+	p.type = SC_CHAT;
+	strcpy_s(p.mess, mess);
+	do_send(&p);
+}
+
 

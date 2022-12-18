@@ -506,12 +506,12 @@ void process_packet(int c_id, char* packet)
 						cpl->_ll.lock();
 						lua_getglobal(clients[near_pl]->_L, "set_hp");
 
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power- clients[c_id]->_power/2);
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power- clients[c_id]->_level);
 						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
 						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
 							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
 						cpl->_ll.unlock();
-						cout <<  "범위 공격으로 온스터에게" << clients[c_id]->_power - clients[c_id]->_power / 2 << "피해를 입힘" << endl;
+						cout <<  "범위 공격으로 온스터에게" << clients[c_id]->_power - clients[c_id]->_level << "피해를 입힘" << endl;
 					}
 				}
 
@@ -636,7 +636,7 @@ void worker_thread(HANDLE h_iocp) {
 		case OP_AI_NEAR_CHECK: {
 			clients[key]->_ll.lock();
 			auto L = clients[key]->_L;
-			lua_getglobal(L, "event_player_move");
+			lua_getglobal(L, "event_player_move"); //여기서 버그 터짐
 			lua_pushnumber(L, ex_over->_ai_target_obj);
 			lua_pcall(L, 1, 1, 0);
 			//여기서 근처에 있는지 체크 1이면 영역 안에 들어옴
@@ -813,6 +813,9 @@ int API_MonsterDie(lua_State* L)
 		clients[user_id]->_power = clients[user_id]->_level * 5;
 	}
 	reinterpret_cast<Player*>(clients[user_id])->send_stat_changel_packet();// 경험치 받은 플레이어 정보 전달 
+	char c_buf[64] ;
+	sprintf_s(c_buf, "Kill %s you recived %dEXP", clients[moster_id]->_name , exp);
+	reinterpret_cast<Player*>(clients[user_id])->send_chat_packet(user_id, c_buf); //채팅 전달
 	//다른 유저한테 얘 죽었다고 알려줘야됨
 	for (int i = 0; i < MAX_USER; ++i) {
 		if (can_see(moster_id, i)) {
@@ -832,11 +835,12 @@ int API_MonsterDie(lua_State* L)
 int API_MonsterHit(lua_State* L)
 {
 	cout << "몬스터 맞음" << endl;
+	int damage = (int)lua_tointeger(L, -4);
 	int c_id = (int)lua_tointeger(L, -3);
 	int user_id = (int)lua_tointeger(L, -2);
 	int hp = (int)lua_tointeger(L, -1);
 
-	lua_pop(L, 3);
+	lua_pop(L, 4);
 
 	clients[c_id]->_hp = hp;
 
@@ -845,6 +849,10 @@ int API_MonsterHit(lua_State* L)
 			reinterpret_cast<Player*>(clients[i])->send_monster_hp_packet(c_id, hp);
 		}
 	}
+	char c_buf[64];
+	sprintf_s(c_buf, " you hit %s : %d damaged ", clients[c_id]->_name, damage);
+	reinterpret_cast<Player*>(clients[user_id])->send_chat_packet(user_id, c_buf); //채팅 전달
+
 	if (reinterpret_cast<Monster*>(clients[c_id])->_current_state != CST_CHASE) {
 		reinterpret_cast<Monster*>(clients[c_id])->_current_state = CST_CHASE;
 		TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 1s, EV_CHASE, user_id };//플레이어 따라가라
@@ -863,6 +871,10 @@ int API_attack(lua_State* L)
 	lua_pop(L, 2);
 
 	clients[plyaer_id]->_hp -= clients[monster_id]->_level*5;
+	char c_buf[64];
+	sprintf_s(c_buf, "hit by %s : %d damaged ", clients[monster_id]->_name, clients[monster_id]->_level * 5);
+	reinterpret_cast<Player*>(clients[plyaer_id])->send_chat_packet(plyaer_id, c_buf); //채팅 전달
+
 	if (clients[plyaer_id]->_hp <= 0)//죽음
 	{
 		clients[plyaer_id]->_exp /= 2;

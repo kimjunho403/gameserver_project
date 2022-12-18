@@ -17,7 +17,7 @@ public:
 	void send_stat_changel_packet();
 	void send_player_attack_packet(int c_id, short _attack_type);
 	void send_monster_hp_packet(int c_id, int hp);
-	void send_buff_packet(int c_id, SESSION* clients, float colltime);
+	void send_chat_packet(int c_id, const char* mess);
 };
 
 
