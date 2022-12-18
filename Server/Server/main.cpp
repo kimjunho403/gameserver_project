@@ -49,13 +49,7 @@ void init_obstacle() {
 		}
 	}
 	cout << "obstacle init end" << endl;
-	//for (auto& _ob : obsatcles) {
-	//	_ob._id = i;
-	//	_ob._x = rand() % 2000;
-	//	_ob._y = rand() % 2000;
-	//	i++;
 
-	//}
 }
 bool is_collision(SESSION* player, short dir) {
 	switch (dir)
@@ -200,18 +194,9 @@ void do_ai_chase_move(int ai_id,int target_id)
 		if (true == can_see(npc._id, obj->_id))
 			old_vl.insert(obj->_id);
 	}
-	reinterpret_cast<Monster*>(&npc)->chase_move(clients[target_id]);
+	reinterpret_cast<Monster*>(&npc)->chase_move(clients[target_id],&obsatcles);
 
-	//int x = npc._x;
-	//int y = npc._y;
-	//switch (rand() % 4) {
-	//case 0: if (x < (W_WIDTH - 1)) x++; break;
-	//case 1: if (x > 0) x--; break;
-	//case 2: if (y < (W_HEIGHT - 1)) y++; break;
-	//case 3:if (y > 0) y--; break;
-	//}
-	//npc._x = x;
-	//npc._y = y;
+	
 
 	unordered_set<int> new_vl;
 	for (auto& obj : clients) {//좌표 변환후 뷰 리스트에 유저 추가
@@ -248,6 +233,8 @@ void do_ai_chase_move(int ai_id,int target_id)
 
 void WakeUpNPC(int npc_id, int waker)
 {
+	//길찾기 
+	/*reinterpret_cast<Monster*>(clients[npc_id])->find_root(clients[waker],&obsatcles);*/
 	if (reinterpret_cast<Monster*>(clients[npc_id])->_current_state != CST_CHASE) {
 		OVER_EXP* exover = new OVER_EXP;
 		exover->_comp_type = OP_AI_NEAR_CHECK;
@@ -727,10 +714,11 @@ void worker_thread(HANDLE h_iocp) {
 			}
 
 			if (true == keep_alive) {
+				//pop
 				do_ai_chase_move(key,ex_over->_ai_target_obj);
 				
 				//do_npc_random_move(static_cast<int>(key));
-				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_CHASE, 0 };
+				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_CHASE, ex_over->_ai_target_obj };
 				timer_queue.push(ev);
 			}
 			else {
@@ -804,8 +792,11 @@ int API_MonsterDie(lua_State* L)
 	lua_pop(L, 3);
 
 	clients[user_id]->_exp += exp;
+	char c_buf[64];
 
 	if (clients[user_id]->_exp >= clients[user_id]->_max_exp) { //레벨 업 
+		sprintf_s(c_buf, "LEVEL UP!!!");
+		reinterpret_cast<Player*>(clients[user_id])->send_chat_packet(user_id, c_buf); //채팅 전달
 		clients[user_id]->_exp = 0;
 		
 		clients[user_id]->_level++;
@@ -813,7 +804,7 @@ int API_MonsterDie(lua_State* L)
 		clients[user_id]->_power = clients[user_id]->_level * 5;
 	}
 	reinterpret_cast<Player*>(clients[user_id])->send_stat_changel_packet();// 경험치 받은 플레이어 정보 전달 
-	char c_buf[64] ;
+	
 	sprintf_s(c_buf, "Kill %s you recived %dEXP", clients[moster_id]->_name , exp);
 	reinterpret_cast<Player*>(clients[user_id])->send_chat_packet(user_id, c_buf); //채팅 전달
 	//다른 유저한테 얘 죽었다고 알려줘야됨
@@ -825,7 +816,6 @@ int API_MonsterDie(lua_State* L)
 	//죽은 몬스터 묘지로
 	clients[moster_id]->_x = -100;
 	clients[moster_id]->_y = -100;
-
 	TIMER_EVENT ev{ moster_id, chrono::system_clock::now() + 10s, EV_RESPAWN, 0 };//10초후 부활해라 타이머 PUSH
 	timer_queue.push(ev);
 
@@ -839,7 +829,6 @@ int API_MonsterHit(lua_State* L)
 	int c_id = (int)lua_tointeger(L, -3);
 	int user_id = (int)lua_tointeger(L, -2);
 	int hp = (int)lua_tointeger(L, -1);
-
 	lua_pop(L, 4);
 
 	clients[c_id]->_hp = hp;
@@ -1078,7 +1067,6 @@ void do_timer()
 			}
 			case EV_BUFF_END:
 			{
-				cout << "EV_BUFF_END호출 " << endl;
 				OVER_EXP* ov = new OVER_EXP;
 				ov->_comp_type = OP_PAYER_BUFF;
 				ov->_ai_target_obj = ev.target_id;

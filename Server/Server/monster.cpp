@@ -64,22 +64,136 @@ void Monster::send_remove_session_packet(int c_id)
 	do_send(&p);
 }
 
-void Monster::chase_move(SESSION* client)
-{
+//void Monster::find_root(SESSION* client, const array<Obstacle, MAX_OBSTACLE>* obstacles)
+//{
+//	int x = _x;
+//	int y = _y;
+//	cout << "find" << endl;
+//	while (!q_root.empty())   q_root.pop();//큐 초기화
+//
+//	while (client->_x != x && client->_y != y) {
+//		if (x < client->_x) {
+//			x++;
+//			for (auto& ob : *obstacles) {
+//				if (x == ob._x && y == ob._y) {
+//					x--;
+//					y++;
+//					q_root.push(DOWN);
+//					break;
+//				}
+//			}
+//
+//			q_root.push(RIGHT);
+//		}
+//		else if (x > client->_x) {
+//			x--;
+//			for (auto& ob : *obstacles) {
+//				if (x == ob._x && y == ob._y) {
+//					x++;
+//					y--;
+//					q_root.push(UP);
+//					break;
+//				}
+//			}
+//			q_root.push(LEFT);
+//		}
+//		else if (y < client->_y) {
+//			y++;
+//			for (auto& ob : *obstacles) {
+//				if (x == ob._x && y == ob._y) {
+//					y--;
+//					x++;
+//					q_root.push(RIGHT);
+//					break;
+//				}
+//			}
+//			q_root.push(DOWN);
+//		}
+//		else if (y > client->_y) {
+//			y--;
+//			for (auto& ob : *obstacles) {
+//				if (x == ob._x && y == ob._y) {
+//					y++;
+//					x--;
+//					q_root.push(LEFT);
+//					break;
+//				}
+//			}
+//			q_root.push(UP);
+//		}
+//	}
+//	cout << "end" << endl;
+//}
 
+void Monster::chase_move(SESSION* client,const array<Obstacle,MAX_OBSTACLE>* obstacles)
+{
+	//switch (q_root.front())
+	//{
+	//case LEFT:
+	//	--_x;
+	//	break;
+	//case RIGHT:
+	//	--_x;
+	//	break;
+	//case UP:
+	//	--_y;
+	//	break;
+	//case DOWN:
+	//	++_y;
+	//	break;
+	//} 
+	//q_root.pop();
+	cout << "move_start" << endl;
+	if (up_chance == true) {
+		_y--;
+		up_chance = false;
+		return;
+	}
+	if (down_chance == true) {
+		_y++;
+		down_chance = false;
+		return;
+	}
 	if (_x < client->_x) {
 		_x++;
+		for (auto& ob : *obstacles) {
+			if (_x == ob._x && _y == ob._y) {
+				--_x;
+				++_y;
+			}
+
+		}
 	}
 	else if(_x > client->_x) {
 		_x--;
+		for (auto& ob : *obstacles) {
+			if (_x == ob._x && _y == ob._y) {
+				++_x;
+				--_y;
+			}
+		}
 	}
 	else if (_y < client->_y) {
 		_y++;
+		for (auto& ob : *obstacles) {
+			if (_x == ob._x && _y == ob._y) {
+				--_y;
+				--_x;
+				down_chance = true;
+			}
+		}
 	}
-	else if (_y > client->_y) {
+	else if (_y > client->_y ) {
 		_y--;
+		for (auto& ob : *obstacles) {
+			if (_x == ob._x && _y == ob._y) {
+				++_y;
+				++_x;
+				up_chance = true;
+			}
+		}
 	}
-
+	cout << "move_end" << endl;
 }
 
 
