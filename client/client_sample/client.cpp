@@ -66,6 +66,7 @@ public:
 	int level;
 	short dir;
 	int power;
+	chrono::system_clock::time_point move_time;
 	OBJECT(sf::Texture& t, int x, int y, int x2, int y2) {
 		m_showing = false;
 		m_sprite.setTexture(t);
@@ -87,6 +88,7 @@ public:
 		m_sprite_attack = a_t;
 		m_sprite_attack.setScale(0.5f, 0.5f);
 		rectSprite_attack = sf::IntRect(20, 20, 190, 170);
+		_is_attack = false;
 	}
 
 	OBJECT() {
@@ -314,6 +316,9 @@ unordered_map <int, OBJECT*> players;
 
 OBJECT white_tile;
 OBJECT black_tile;
+OBJECT skill_1;
+OBJECT skill_2;
+OBJECT skill_3;
 OBJECT trees[MAX_OBSTACLE];
 
 sf::Texture* board;
@@ -322,6 +327,7 @@ sf::Texture* rock;
 sf::Texture* bluesnail;
 sf::Texture* Mushroom;
 sf::Texture* attack_t;
+sf::Texture* skill;
 sf::Sprite* m_sprite;
 void client_initialize()
 {
@@ -332,14 +338,14 @@ void client_initialize()
 	Mushroom = new sf::Texture;
 	attack_t = new sf::Texture;
 	m_sprite = new sf::Sprite;
-
+	skill = new sf::Texture;
 	board->loadFromFile("chessmap.bmp");
 	pieces->loadFromFile("player.png");
 	rock->loadFromFile("rock.png");
 	bluesnail->loadFromFile("Monster1.png");
 	Mushroom->loadFromFile("Monster2.png");
 	attack_t->loadFromFile("attack.png");
-
+	skill->loadFromFile("skill.png");
 
 	m_sprite->setTexture(*attack_t);
 	//m_sprite->setTextureRect(sf::IntRect(420, 140, 30, 26));
@@ -352,8 +358,9 @@ void client_initialize()
 	white_tile = OBJECT{ *board, 4, 4, TILE_WIDTH, TILE_WIDTH };
 	black_tile = OBJECT{ *board, 70, 4, TILE_WIDTH, TILE_WIDTH };
 	avatar = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5, *m_sprite };
-
-
+	skill_1 = OBJECT{ *skill, 60, 825, 55, 55 };
+	skill_2 = OBJECT{ *skill, 480,825, 55, 55 };
+	skill_3 = OBJECT{ *skill, 60, 765, 55, 55 };
 
 	for (auto& tr : trees) {
 		tr = OBJECT{ *rock, 0, 0, TILE_WIDTH, TILE_WIDTH };
@@ -632,7 +639,7 @@ void client_main()
 	g_window->draw(rectangle);
 
 	sf::RectangleShape rectangle_e(sf::Vector2f(250.0f*(float)avatar.exp / ((float)avatar.level * 100), 30.0f));
-	rectangle_e.setFillColor(sf::Color(125, 125, 0));
+	rectangle_e.setFillColor(sf::Color(125, 125, 0,50));
 	rectangle_e.setPosition(10, 110);
 	g_window->draw(rectangle_e);
 
@@ -649,7 +656,17 @@ void client_main()
 	text_player_info.setString(buf);
 
 	g_window->draw(text_player_info);
-
+	
+	float rx = (avatar.m_x - g_left_x) * 55 + 8;
+	float ry = (avatar.m_y - g_top_y) * 55 + 250;
+	skill_1.a_move(rx, ry );
+	skill_1.a_draw();
+	
+	skill_2.a_move(rx+100, ry);
+	skill_2.a_draw();
+	
+	skill_3.a_move(rx+200, ry);
+	skill_3.a_draw();
 }
 
 void send_packet(void* packet)
@@ -699,17 +716,29 @@ int main()
 				if (!avatar._is_attack) {
 					switch (event.key.code) {
 					case sf::Keyboard::Left:
-						direction = 2;
+						if (avatar.move_time + 0.1s < chrono::system_clock::now()) {
+							avatar.move_time = chrono::system_clock::now();
+							direction = 2;
+						}
 
 						break;
 					case sf::Keyboard::Right:
-						direction = 3;
+						if (avatar.move_time + 0.1s < chrono::system_clock::now()) {
+							avatar.move_time = chrono::system_clock::now();
+							direction = 3;
+						}
 						break;
 					case sf::Keyboard::Up:
-						direction = 0;
+						if (avatar.move_time + 0.1s < chrono::system_clock::now()) {
+							avatar.move_time = chrono::system_clock::now();
+							direction = 0;
+						}
 						break;
 					case sf::Keyboard::Down:
-						direction = 1;
+						if (avatar.move_time + 0.1s < chrono::system_clock::now()) {
+							avatar.move_time = chrono::system_clock::now();
+							direction = 1;
+						}
 						break;
 					case sf::Keyboard::Escape:
 						window.close();
