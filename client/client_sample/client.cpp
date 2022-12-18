@@ -53,12 +53,15 @@ protected:
 	sf::Text m_hp_text;
 	sf::Clock clock;
 	sf::Clock attack_clock;
+	
 	sf::IntRect rectSprite;
 	sf::IntRect rectSprite_attack;
 	sf::IntRect rectSprite_attack_2;
+	chrono::system_clock::time_point buff_time;
 	chrono::system_clock::time_point m_mess_end_time;
 public:
 	bool _is_attack;
+	bool _is_buff;
 	int rectSprite_left;
 	int id;
 	int m_x, m_y;
@@ -95,16 +98,28 @@ public:
 		rectSprite_attack = sf::IntRect(20, 20, 190, 170);
 		rectSprite_attack_2 = sf::IntRect(0, 15, 45, 110);
 		_is_attack = false;
+		_is_buff = false;
 	}
 
 	OBJECT() {
 		m_showing = false;
 	}
+	bool do_buff() {
 
+		if (!_is_buff) {
+			
+			buff_time = chrono::system_clock::now();
+			_is_buff = true;
+			return true;
+		}
+		return false;
+	}
 	void show()
 	{
 		m_showing = true;
 	}
+
+
 	void hide()
 	{
 		m_showing = false;
@@ -432,6 +447,7 @@ void ProcessPacket(char* ptr)
 		avatar.exp = packet->exp;
 		avatar.hp = packet->hp;
 		avatar.level = packet->level;
+		avatar.power = packet-> power;
 		avatar.show();
 	}
 	break;
@@ -542,7 +558,7 @@ void ProcessPacket(char* ptr)
 			avatar.max_hp = my_packet->max_hp;
 			avatar.exp = my_packet->exp;
 			avatar.level = my_packet->level;
-		
+			avatar.power = my_packet->power;
 
 		break;
 	}
@@ -554,7 +570,9 @@ void ProcessPacket(char* ptr)
 			avatar._is_attack = true;
 		}
 		else {
+			players[other_id]->attack_type = my_packet->attack_type;
 			players[other_id]->_is_attack = true;
+			
 		}
 		break;
 	}
@@ -671,13 +689,13 @@ void client_main()
 	g_window->draw(rectangle);
 
 	sf::RectangleShape rectangle_e(sf::Vector2f(250.0f*(float)avatar.exp / ((float)avatar.level * 100), 30.0f));
-	rectangle_e.setFillColor(sf::Color(125, 125, 0,50));
+	rectangle_e.setFillColor(sf::Color(125, 125, 0));
 	rectangle_e.setPosition(10, 110);
 	g_window->draw(rectangle_e);
 
 	g_window->draw(text_player_info);
 	buf[0] = '\0';
-	sprintf_s(buf, "\n\n POWER %d ", avatar.level *5);
+	sprintf_s(buf, "\n\n POWER %d ", avatar.power);
 	text_player_info.setFillColor(sf::Color(0, 255, 0));
 	text_player_info.setString(buf);
 
@@ -778,12 +796,22 @@ int main()
 					case sf::Keyboard::A:
 						attack = true;
 						avatar._is_attack = true;
-						avatar.attack_type = 0; //범위공격
+						avatar.attack_type = 0; //방향공격
 						break;
+
 					case sf::Keyboard::S:
 						attack = true;
 						avatar._is_attack = true;
 						avatar.attack_type = 1; //범위공격
+						break;
+
+					case sf::Keyboard::D: //버프 
+						if (avatar.do_buff()) {
+							CS_BUFF_PACKET p;
+							p.size = sizeof(p);
+							p.type = CS_BUFF;
+							send_packet(&p);
+						}
 						break;
 					}
 
@@ -801,6 +829,7 @@ int main()
 					p.size = sizeof(p);
 					p.type = CS_ATTACK;
 					p.attack_type = avatar.attack_type;
+					cout <<"attack_type = " << avatar.attack_type << endl;
 					send_packet(&p);
 					attack = false;
 				}

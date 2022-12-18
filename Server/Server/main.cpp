@@ -7,7 +7,7 @@
 #include "DB.h"
 #include <random>
 
-enum EVENT_TYPE { EV_RANDOM_MOVE, EV_RESPAWN, EV_HPUP, EV_CHASE };
+enum EVENT_TYPE { EV_RANDOM_MOVE, EV_RESPAWN, EV_HPUP, EV_CHASE, EV_BUFF_END };
 
 struct TIMER_EVENT {
 	int obj_id;
@@ -418,18 +418,27 @@ void process_packet(int c_id, char* packet)
 		}
 		break;
 	}
+	case CS_BUFF: {
+		CS_BUFF_PACKET* p = reinterpret_cast<CS_BUFF_PACKET*>(packet);
+
+		OVER_EXP* exover = new OVER_EXP;
+		exover->_comp_type = OP_PAYER_BUFF;
+		PostQueuedCompletionStatus(h_iocp, 1, c_id, &exover->_over);
+
+		break;
+	}
 	case CS_ATTACK: {
 		CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
 
 		clients[c_id]->_vl.lock();
 		unordered_set<int> old_vlist = clients[c_id]->_view_list;
 		clients[c_id]->_vl.unlock();
-
+		cout << "p->attack_type = " << p->attack_type << endl;
 		//npc 뷰리스트에서 공격체크 
 		for (auto& near_pl : old_vlist) {
 			auto& cpl = clients[near_pl];
 			if (clients[near_pl]->_id > MAX_USER) {
-				if (p->attack_type = 0) {
+				if (p->attack_type == 0) {
 					switch (clients[c_id]->_dir)
 					{
 					case LEFT:
@@ -492,7 +501,7 @@ void process_packet(int c_id, char* packet)
 						break;
 					}
 				}
-				else {
+				else {//범위공격
 					if (abs(clients[near_pl]->_x - clients[c_id]->_x) <= 2 && abs(clients[near_pl]->_y - clients[c_id]->_y) <= 2) {
 						cpl->_ll.lock();
 						lua_getglobal(clients[near_pl]->_L, "set_hp");
@@ -502,13 +511,13 @@ void process_packet(int c_id, char* packet)
 						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
 							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
 						cpl->_ll.unlock();
-						cout << "온스터에게" << clients[c_id]->_power/2 << "피해를 입힘" << endl;
+						cout <<  "범위 공격으로 온스터에게" << clients[c_id]->_power - clients[c_id]->_power / 2 << "피해를 입힘" << endl;
 					}
 				}
 
 			}
 			else { //player to player
-				reinterpret_cast<Player*>(clients[near_pl])->send_player_attack_packet(c_id);
+				reinterpret_cast<Player*>(clients[near_pl])->send_player_attack_packet(c_id, p->attack_type);
 				//reinterpret_cast<Player*>(clients[c_id])->send_player_attack_packet(near_pl);
 			}
 			//	else WakeUpNPC(near_pl, c_id);
@@ -684,6 +693,27 @@ void worker_thread(HANDLE h_iocp) {
 			delete ex_over;
 		}
 						   break;
+		case OP_PAYER_BUFF: {
+			if (!reinterpret_cast<Player*>(clients[key])->_is_buff) {
+				cout << "버프 작동" << endl;
+				clients[key]->_power =clients[key]->_power * 2;
+				reinterpret_cast<Player*>(clients[key])->send_stat_changel_packet();
+				//시야에 들어오는 플레이어에게 보여주기 
+
+				TIMER_EVENT ev{ key, chrono::system_clock::now() + 10s, EV_BUFF_END, 0 };
+				timer_queue.push(ev);
+				reinterpret_cast<Player*>(clients[key])->_is_buff = true;
+				delete ex_over;
+			}
+			else {
+				cout << "버프 비활성화" << endl;
+				clients[key]->_power = clients[key]->_level *5;
+				reinterpret_cast<Player*>(clients[key])->send_stat_changel_packet();
+				reinterpret_cast<Player*>(clients[key])->_is_buff = false;
+				delete ex_over;
+			}
+		}
+						  break;
 		case OP_CHASE : {
 			bool keep_alive = false;
 			for (int j = 0; j < MAX_USER; ++j) {//계속 누군가의 시야에 있다면 keep_alive를 true로
@@ -1027,6 +1057,16 @@ void do_timer()
 			{
 				OVER_EXP* ov = new OVER_EXP;
 				ov->_comp_type = OP_CHASE;
+				ov->_ai_target_obj = ev.target_id;
+				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
+
+				break;
+			}
+			case EV_BUFF_END:
+			{
+				cout << "EV_BUFF_END호출 " << endl;
+				OVER_EXP* ov = new OVER_EXP;
+				ov->_comp_type = OP_PAYER_BUFF;
 				ov->_ai_target_obj = ev.target_id;
 				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
 

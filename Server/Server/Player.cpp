@@ -116,17 +116,17 @@ void Player::send_stat_changel_packet()
 	p.max_hp = _level * 10;
 	p.exp = _exp;
 	p.level = _level;
-
+	p.power = _power;
 	do_send(&p);
 }
 
-void Player::send_player_attack_packet(int c_id)
+void Player::send_player_attack_packet(int c_id, short _attack_type)
 {
 	SC_PLAYERATTACK_PACKET p;
 	p.id = c_id;
 	p.size = sizeof(SC_PLAYERATTACK_PACKET);
 	p.type = SC_PLAYERATTACK;
-
+	p.attack_type = _attack_type;
 	do_send(&p);
 }
 

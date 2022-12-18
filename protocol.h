@@ -21,7 +21,7 @@ constexpr char CS_CHAT = 2; //채팅
 constexpr char CS_ATTACK = 3;			// 4 방향 공격
 constexpr char CS_TELEPORT = 4;			// RANDOM한 위치로 Teleport, Stress Test할 때 Hot Spot현상을 피하기 위해 구현 stress 테스트에서 쓰는거
 constexpr char CS_LOGOUT = 5;			// 클라이언트에서 정상적으로 접속을 종료하는 패킷
-
+constexpr char CS_BUFF = 6;
 
 constexpr char SC_LOGIN_INFO = 2;
 constexpr char SC_ADD_OBJECT = 3;
@@ -70,6 +70,11 @@ struct CS_ATTACK_PACKET {
 	char	type;
 	short attack_type;
 };
+struct CS_BUFF_PACKET {
+	unsigned char size;
+	char	type;
+};
+
 
 struct SC_LOGIN_INFO_PACKET {
 	unsigned char size;
@@ -80,7 +85,7 @@ struct SC_LOGIN_INFO_PACKET {
 	int		hp;
 	int		exp;
 	int		level;
-	
+	int power;
 };
 
 struct SC_ADD_OBJECT_PACKET {
@@ -133,7 +138,7 @@ struct SC_STAT_CHANGEL_PACKET {
 	int		max_hp;
 	int		exp;
 	int		level;
-
+	int		power;
 };
 
 struct SC_OBSTACLE_PACKET {
@@ -147,7 +152,7 @@ struct SC_PLAYERATTACK_PACKET {
 	unsigned char size;
 	char	type;
 	int		id;
-	
+	short attack_type;
 };
 struct SC_MONSTER_HP_PACKET {
 	unsigned char size;
