@@ -47,6 +47,7 @@ protected:
 	bool m_showing;
 	sf::Sprite m_sprite;
 	sf::Sprite m_sprite_attack;
+	sf::Sprite m_sprite_attack_2;
 	sf::Text m_name;
 	sf::Text m_chat;
 	sf::Text m_hp_text;
@@ -54,6 +55,7 @@ protected:
 	sf::Clock attack_clock;
 	sf::IntRect rectSprite;
 	sf::IntRect rectSprite_attack;
+	sf::IntRect rectSprite_attack_2;
 	chrono::system_clock::time_point m_mess_end_time;
 public:
 	bool _is_attack;
@@ -66,6 +68,7 @@ public:
 	int level;
 	short dir;
 	int power;
+	short attack_type;
 	chrono::system_clock::time_point move_time;
 	OBJECT(sf::Texture& t, int x, int y, int x2, int y2) {
 		m_showing = false;
@@ -77,7 +80,7 @@ public:
 		m_mess_end_time = chrono::system_clock::now();
 	}
 
-	OBJECT(sf::Texture& t, int x, int y, int x2, int y2, sf::Sprite& a_t) {
+	OBJECT(sf::Texture& t, int x, int y, int x2, int y2, sf::Sprite& a_t, sf::Sprite& a_t2) {
 		m_showing = false;
 		m_sprite.setTexture(t);
 		rectSprite = sf::IntRect(x, y, x2, y2);
@@ -87,14 +90,17 @@ public:
 		m_hp_text.setFont(g_font);
 		m_sprite_attack = a_t;
 		m_sprite_attack.setScale(0.5f, 0.5f);
+		m_sprite_attack_2 = a_t2;
+		m_sprite_attack_2.setScale(1.0f, 0.6f);
 		rectSprite_attack = sf::IntRect(20, 20, 190, 170);
+		rectSprite_attack_2 = sf::IntRect(0, 15, 45, 110);
 		_is_attack = false;
 	}
 
 	OBJECT() {
 		m_showing = false;
 	}
-	
+
 	void show()
 	{
 		m_showing = true;
@@ -219,40 +225,61 @@ public:
 	void attack() {
 		float rx = (m_x - g_left_x) * TILE_WIDTH + 8;
 		float ry = (m_y - g_top_y) * TILE_WIDTH + 8;
-		switch (dir)
-		{
-		case LEFT:
-			m_sprite_attack.setPosition(rx - TILE_WIDTH, ry);
-			break;
-		case RIGHT:
-			m_sprite_attack.setPosition(rx + TILE_WIDTH, ry);
-			break;
-		case UP:
-			m_sprite_attack.setPosition(rx, ry + TILE_WIDTH);
-			break;
-		case DOWN:
-			m_sprite_attack.setPosition(rx, ry - TILE_WIDTH);
-			break;
-		}
-
-		if (attack_clock.getElapsedTime().asSeconds() > 0.1f)
-		{
-			if (rectSprite_attack.left == 20 + 190 * 4) {
-				rectSprite_attack.left = 20;
-				_is_attack = false;
+		if (attack_type == 0) {
+			switch (dir)
+			{
+			case LEFT:
+				m_sprite_attack.setPosition(rx - TILE_WIDTH, ry);
+				break;
+			case RIGHT:
+				m_sprite_attack.setPosition(rx + TILE_WIDTH, ry);
+				break;
+			case UP:
+				m_sprite_attack.setPosition(rx, ry + TILE_WIDTH);
+				break;
+			case DOWN:
+				m_sprite_attack.setPosition(rx, ry - TILE_WIDTH);
+				break;
 			}
-			else
-				rectSprite_attack.left += 190;
 
-			m_sprite_attack.setTextureRect(rectSprite_attack);
-			attack_clock.restart();
+			if (attack_clock.getElapsedTime().asSeconds() > 0.1f)
+			{
+				if (rectSprite_attack.left == 20 + 190 * 4) {
+					rectSprite_attack.left = 20;
+					_is_attack = false;
+				}
+				else
+					rectSprite_attack.left += 190;
+
+				m_sprite_attack.setTextureRect(rectSprite_attack);
+				attack_clock.restart();
+			}
+
+			g_window->draw(m_sprite_attack);
 		}
+		else {
+			for (int i = -2; i < 3; i++) {
+				for (int j = -2; j < 3; j++) {
+					m_sprite_attack_2.setPosition(rx + TILE_WIDTH * i, ry + TILE_WIDTH * j-7);
 
+					if (attack_clock.getElapsedTime().asSeconds() > 0.1f)
+					{
+						if (rectSprite_attack_2.top == 15 + 118 * 3) {
+							rectSprite_attack_2.top = 15;
+							_is_attack = false;
+						}
+						else
+							rectSprite_attack_2.top += 118;
 
-		//	attack_clock.restart();
+						m_sprite_attack_2.setTextureRect(rectSprite_attack_2);
+						attack_clock.restart();
+					}
 
-		g_window->draw(m_sprite_attack);
-
+					g_window->draw(m_sprite_attack_2);
+				}
+			}
+			
+		}
 	}
 };
 
@@ -327,8 +354,10 @@ sf::Texture* rock;
 sf::Texture* bluesnail;
 sf::Texture* Mushroom;
 sf::Texture* attack_t;
+sf::Texture* attack_t_2;
 sf::Texture* skill;
 sf::Sprite* m_sprite;
+sf::Sprite* m_sprite_2;
 void client_initialize()
 {
 	board = new sf::Texture;
@@ -337,7 +366,9 @@ void client_initialize()
 	bluesnail = new sf::Texture;
 	Mushroom = new sf::Texture;
 	attack_t = new sf::Texture;
+	attack_t_2 = new sf::Texture;
 	m_sprite = new sf::Sprite;
+	m_sprite_2 = new sf::Sprite;
 	skill = new sf::Texture;
 	board->loadFromFile("chessmap.bmp");
 	pieces->loadFromFile("player.png");
@@ -345,19 +376,19 @@ void client_initialize()
 	bluesnail->loadFromFile("Monster1.png");
 	Mushroom->loadFromFile("Monster2.png");
 	attack_t->loadFromFile("attack.png");
+	attack_t_2->loadFromFile("attack2.png");
 	skill->loadFromFile("skill.png");
-
 	m_sprite->setTexture(*attack_t);
-	//m_sprite->setTextureRect(sf::IntRect(420, 140, 30, 26));
 	m_sprite->setTextureRect(sf::IntRect(420, 270, 30, 26));
-
+	m_sprite_2->setTexture(*attack_t_2);
+	m_sprite_2->setTextureRect(sf::IntRect(0, 15, 45, 110));
 	if (false == g_font.loadFromFile("cour.ttf")) {
 		cout << "Font Loading Error!\n";
 		exit(-1);
 	}
 	white_tile = OBJECT{ *board, 4, 4, TILE_WIDTH, TILE_WIDTH };
 	black_tile = OBJECT{ *board, 70, 4, TILE_WIDTH, TILE_WIDTH };
-	avatar = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5, *m_sprite };
+	avatar = OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5, *m_sprite, *m_sprite_2 };
 	skill_1 = OBJECT{ *skill, 60, 825, 55, 55 };
 	skill_2 = OBJECT{ *skill, 480,825, 55, 55 };
 	skill_3 = OBJECT{ *skill, 60, 765, 55, 55 };
@@ -379,6 +410,7 @@ void client_finish()
 	delete bluesnail;
 	delete Mushroom;
 	delete attack_t;
+	delete attack_t_2;
 	delete m_sprite;
 }
 
@@ -416,7 +448,7 @@ void ProcessPacket(char* ptr)
 			avatar.show();
 		}
 		else if (id < MAX_USER) {
-			players[id] = new OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 , *m_sprite };
+			players[id] = new OBJECT{ *pieces, 20,20, TILE_WIDTH, TILE_WIDTH + 5 , *m_sprite,*m_sprite_2 };
 			players[id]->id = id;
 			players[id]->hp = my_packet->hp;
 			players[id]->level = my_packet->level;
@@ -746,8 +778,15 @@ int main()
 					case sf::Keyboard::A:
 						attack = true;
 						avatar._is_attack = true;
+						avatar.attack_type = 0; //범위공격
+						break;
+					case sf::Keyboard::S:
+						attack = true;
+						avatar._is_attack = true;
+						avatar.attack_type = 1; //범위공격
 						break;
 					}
+
 				}
 				if (-1 != direction) {
 					CS_MOVE_PACKET p;
@@ -761,6 +800,7 @@ int main()
 					CS_ATTACK_PACKET p;
 					p.size = sizeof(p);
 					p.type = CS_ATTACK;
+					p.attack_type = avatar.attack_type;
 					send_packet(&p);
 					attack = false;
 				}
@@ -771,6 +811,7 @@ int main()
 		client_main();
 		window.display();
 	}
+
 	client_finish();
 
 	return 0;

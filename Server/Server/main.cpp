@@ -419,7 +419,7 @@ void process_packet(int c_id, char* packet)
 		break;
 	}
 	case CS_ATTACK: {
-		//CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
+		CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
 
 		clients[c_id]->_vl.lock();
 		unordered_set<int> old_vlist = clients[c_id]->_view_list;
@@ -429,68 +429,82 @@ void process_packet(int c_id, char* packet)
 		for (auto& near_pl : old_vlist) {
 			auto& cpl = clients[near_pl];
 			if (clients[near_pl]->_id > MAX_USER) {
-				switch (clients[c_id]->_dir)
-				{
-				case LEFT:
-					if (clients[near_pl]->_x + 1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
-						//clients[near_pl]->_hp -= clients[c_id]->_power; // 체력 -
-						cpl->_ll.lock();
-						lua_getglobal(clients[near_pl]->_L, "set_hp");
+				if (p->attack_type = 0) {
+					switch (clients[c_id]->_dir)
+					{
+					case LEFT:
+						if (clients[near_pl]->_x + 1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power; // 체력 -
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
 
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
 
-						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-						cpl->_ll.unlock();
-						// lua_pop(L, 1);// eliminate set_uid from stack after call
-						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+							cpl->_ll.unlock();
+							// lua_pop(L, 1);// eliminate set_uid from stack after call
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
+					case RIGHT:
+						if (clients[near_pl]->_x - 1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power;
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
+
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+							cpl->_ll.unlock();
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
+					case UP:
+						if (clients[near_pl]->_x == clients[c_id]->_x && clients[near_pl]->_y - 1 == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power;
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
+
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+							cpl->_ll.unlock();
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
+					case DOWN:
+						if (clients[near_pl]->_x == clients[c_id]->_x && clients[near_pl]->_y + 1 == clients[c_id]->_y) {
+							//clients[near_pl]->_hp -= clients[c_id]->_power;
+							cpl->_ll.lock();
+							lua_getglobal(clients[near_pl]->_L, "set_hp");
+
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
+							lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+							if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+								printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+							cpl->_ll.unlock();
+							cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
+						}
+						break;
 					}
-					break;
-				case RIGHT:
-					if (clients[near_pl]->_x - 1 == clients[c_id]->_x && clients[near_pl]->_y == clients[c_id]->_y) {
-						//clients[near_pl]->_hp -= clients[c_id]->_power;
-						cpl->_ll.lock();
-						lua_getglobal(clients[near_pl]->_L, "set_hp");
-
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
-						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-						cpl->_ll.unlock();
-						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
-					}
-					break;
-				case UP:
-					if (clients[near_pl]->_x == clients[c_id]->_x && clients[near_pl]->_y - 1 == clients[c_id]->_y) {
-						//clients[near_pl]->_hp -= clients[c_id]->_power;
-						cpl->_ll.lock();
-						lua_getglobal(clients[near_pl]->_L, "set_hp");
-
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
-						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-						cpl->_ll.unlock();
-						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
-					}
-					break;
-				case DOWN:
-					if (clients[near_pl]->_x == clients[c_id]->_x && clients[near_pl]->_y + 1 == clients[c_id]->_y) {
-						//clients[near_pl]->_hp -= clients[c_id]->_power;
-						cpl->_ll.lock();
-						lua_getglobal(clients[near_pl]->_L, "set_hp");
-
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power);
-						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
-						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
-							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
-						cpl->_ll.unlock();
-						cout << "온스터에게" << clients[c_id]->_power << "피해를 입힘" << endl;
-					}
-					break;
 				}
+				else {
+					if (abs(clients[near_pl]->_x - clients[c_id]->_x) <= 2 && abs(clients[near_pl]->_y - clients[c_id]->_y) <= 2) {
+						cpl->_ll.lock();
+						lua_getglobal(clients[near_pl]->_L, "set_hp");
 
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_power- clients[c_id]->_power/2);
+						lua_pushnumber(clients[near_pl]->_L, clients[c_id]->_id);
+						if (lua_pcall(clients[near_pl]->_L, 2, 0, 0))
+							printf("Error calling lua function: %s\n", lua_tostring(clients[near_pl]->_L, -1));
+						cpl->_ll.unlock();
+						cout << "온스터에게" << clients[c_id]->_power/2 << "피해를 입힘" << endl;
+					}
+				}
 
 			}
 			else { //player to player

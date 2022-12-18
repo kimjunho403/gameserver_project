@@ -68,6 +68,7 @@ struct CS_LOGOUT_PACKET {
 struct CS_ATTACK_PACKET {
 	unsigned char size;
 	char	type;
+	short attack_type;
 };
 
 struct SC_LOGIN_INFO_PACKET {
