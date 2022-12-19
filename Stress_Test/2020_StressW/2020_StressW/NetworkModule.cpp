@@ -149,7 +149,7 @@ void ProcessPacket(int ci, unsigned char packet[])
 				g_clients[my_id].x = move_packet->x;
 				g_clients[my_id].y = move_packet->y;
 			}
-			if (ci == my_id) {
+			if (ci == my_id && my_id < MAX_CLIENTS) {
 				if (0 != move_packet->move_time) {
 					auto d_ms = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count() -move_packet->move_time;//µô·¹ÀÌ
 					
@@ -157,6 +157,7 @@ void ProcessPacket(int ci, unsigned char packet[])
 					else if (global_delay > d_ms) global_delay--;
 				}
 			}
+		
 		}
 	}
 					   break;
@@ -167,7 +168,8 @@ void ProcessPacket(int ci, unsigned char packet[])
 	case SC_MONSTERHP: break;
 	case SC_STAT_CHANGE: break;
 	case SC_LOGIN_FAIL: break;
-
+	case SC_LOGIN_OK: break;
+	case SC_CHAT: break;
 	case SC_LOGIN_INFO:
 	{
 		g_clients[ci].connected = true;
@@ -179,10 +181,10 @@ void ProcessPacket(int ci, unsigned char packet[])
 		g_clients[my_id].x = login_packet->x;
 		g_clients[my_id].y = login_packet->y;
 
-		//cs_packet_teleport t_packet;
-		//t_packet.size = sizeof(t_packet);
-		//t_packet.type = CS_TELEPORT;
-		//SendPacket(my_id, &t_packet);
+		CS_TELEPORT_PACKET t_packet;
+		t_packet.size = sizeof(t_packet);
+		t_packet.type = CS_TELEPORT;
+		SendPacket(my_id, &t_packet);
 	}
 	break;
 	default: MessageBox(hWnd, L"Unknown Packet Type", L"ERROR", 0);

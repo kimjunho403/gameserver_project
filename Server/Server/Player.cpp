@@ -22,7 +22,7 @@ void Player::do_send(void* packet)
 	WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
 }
 
-void Player::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
+void Player::send_move_packet(int c_id, SESSION* clients)
 {
 	SC_MOVE_OBJECT_PACKET p;
 	p.id = c_id;
@@ -31,7 +31,7 @@ void Player::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
 	p.x = clients->_x;
 	p.y = clients->_y;
 	p.dir = clients->_dir;
-	p.move_time = move_time;
+	p.move_time = last_movetime;
 	do_send(&p);
 }
 

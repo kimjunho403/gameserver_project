@@ -23,7 +23,7 @@ end
 
 function set_hp(x,player)
    hp =hp - x;
-   API_MonsterHit(myid,player,hp);
+  API_MonsterHit(x,myid,player,hp);
    if(hp <=0) then
        API_MonsterDie(myid,player,exp);
        hp= 10* level

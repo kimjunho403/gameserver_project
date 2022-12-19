@@ -34,7 +34,7 @@ public:
 	virtual ~SESSION();
 	virtual  void do_recv() = 0;
 	virtual void do_send(void* packet) = 0;
-	virtual void send_move_packet(int c_id,SESSION* clients, unsigned move_time) = 0;
+	virtual void send_move_packet(int c_id,SESSION* clients) = 0;
 	virtual void send_login_info_packet() = 0;
 	virtual void add_session_packet(int c_id, SESSION* clients) = 0;
 	virtual void send_remove_session_packet(int c_id) = 0;

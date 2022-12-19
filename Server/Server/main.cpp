@@ -34,7 +34,6 @@ array < Obstacle, MAX_OBSTACLE > obsatcles;
 DB User_DB;
 
 
-
 void init_obstacle() {
 	cout << "obstacle init" << endl;
 	int i = 0;
@@ -120,8 +119,10 @@ void disconnect(int c_id)
 	}
 	closesocket(clients[c_id]->_socket);
 
-	lock_guard<mutex> ll(clients[c_id]->_s_lock);
-	clients[c_id]->_state = ST_FREE;
+	{
+		lock_guard<mutex> ll(clients[c_id]->_s_lock);
+		clients[c_id]->_state = ST_FREE;
+	}
 #ifdef STRESS_TEST
 
 #else
@@ -135,7 +136,7 @@ void do_npc_random_move(int npc_id)
 	unordered_set<int> old_vl;
 	for (auto& obj : clients) {//npc기준 시야에 닿는 유저 뷰리스트에 유저 추가
 		if (ST_INGAME != obj->_state) continue;
-		if (true == obj->_id > MAX_USER) continue;
+		if (true == obj->_id > MAX_USER) break;//npc 부터는 상관없으니까
 		if (true == can_see(npc._id, obj->_id))
 			old_vl.insert(obj->_id);
 	}
@@ -154,7 +155,7 @@ void do_npc_random_move(int npc_id)
 	unordered_set<int> new_vl;
 	for (auto& obj : clients) {//좌표 변환후 뷰 리스트에 유저 추가
 		if (ST_INGAME != obj->_state) continue;
-		if (true == obj->_id > MAX_USER) continue;
+		if (true == obj->_id > MAX_USER) break;
 		if (true == can_see(npc._id, obj->_id))
 			new_vl.insert(obj->_id);
 	}
@@ -166,7 +167,7 @@ void do_npc_random_move(int npc_id)
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
-			clients[pl]->send_move_packet(npc._id, clients[npc._id], clients[npc._id]->last_movetime);
+			clients[pl]->send_move_packet(npc._id, clients[npc._id]);
 		}
 	}
 	///시야에 있었다가 사라짐
@@ -213,7 +214,7 @@ void do_ai_chase_move(int ai_id,int target_id)
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
-			clients[pl]->send_move_packet(npc._id, clients[npc._id], clients[npc._id]->last_movetime);
+			clients[pl]->send_move_packet(npc._id, clients[npc._id]);
 		}
 	}
 	///시야에 있었다가 사라짐
@@ -259,51 +260,57 @@ void process_packet(int c_id, char* packet)
 {
 	switch (packet[1]) {
 	case CS_LOGIN: {
-		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
-		//이미 로그인 한 플레이어인지 체크 
-		for (auto& cl : clients) {
-			if (0 == strcmp(cl->_name, p->name) && cl->_state == ST_INGAME) {
-				reinterpret_cast<Player*>(clients[c_id])->send_login_fail_packet();
-				disconnect(c_id);
-				return;
-		}
-			if (cl->_id > MAX_USER) break;
-			
-			
-		}
-
-		strcpy_s(clients[c_id/*얘가 로그인한걸 알려줌*/]->_name, p->name);
-
-#ifdef STRESS_TEST
 		{
-			lock_guard<mutex> ll{ clients[c_id]->_s_lock };
-			clients[c_id]->_x = rand() % W_WIDTH;
-			clients[c_id]->_y = rand() % W_HEIGHT;
-		}
-#else
-	
+			lock_guard<mutex> ll(User_DB.db_l);
+			CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 
-		if (false == User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))//없는 아이디라면
-		{
-			if (!User_DB.add_user(clients[c_id]->_name)) {
-				reinterpret_cast<Player*>(clients[c_id])->send_login_fail_packet();
-				disconnect(c_id);
-				return;
+			strcpy_s(clients[c_id/*얘가 로그인한걸 알려줌*/]->_name, p->name);
+
+			int is_exist;
+			User_DB.exist_id(p->name, &is_exist);
+
+			if (is_exist == 0) {//없는 아이디
+				User_DB.add_user(p->name);
+				if (false == User_DB.load_info(p->name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))
+				{
+					cout << "불러오기 실패 1== " << p->name << endl;
+					reinterpret_cast<Player*>(clients[c_id])->send_login_fail_packet();
+					disconnect(c_id);
+					return;
+				}
+				else {
+					cout << "불러오기 완료" << endl;
+					clients[c_id]->_power = clients[c_id]->_level * 5;
+					clients[c_id]->_max_exp = clients[c_id]->_level * 100;
+
+				}
 			}
+			else {//있는 아이디
+				//이미 로그인 한 플레이어인지 체크 
+				for (auto& cl : clients) {
+					if (0 == strcmp(cl->_name, p->name) && cl->_state == ST_INGAME) {
+						reinterpret_cast<Player*>(clients[c_id])->send_login_fail_packet();
+						disconnect(c_id);
+						cout << "접속하고 있는 플레이어입니다." << endl;
+						return;
+					}
+					if (cl->_id > MAX_USER) break;
+				}
+				if (false == User_DB.load_info(p->name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp))
+				{
+					cout << "불러오기 실패2 == " << p->name << endl;
+					reinterpret_cast<Player*>(clients[c_id])->send_login_fail_packet();
+					disconnect(c_id);
+					return;
+				}
+				else {
+					//cout << "불러오기 완료" << endl;
+					clients[c_id]->_power = clients[c_id]->_level * 5;
+					clients[c_id]->_max_exp = clients[c_id]->_level * 100; ;
 
-			User_DB.check_id(clients[c_id]->_name, clients[c_id]->_x, clients[c_id]->_y, clients[c_id]->_level, clients[c_id]->_hp, clients[c_id]->_exp);
-
-			clients[c_id]->_power = clients[c_id]->_level * 5;
-			clients[c_id]->_max_exp = clients[c_id]->_level * 100; ;
+				}
+			}
 		}
-		else {
-			clients[c_id]->_power = clients[c_id]->_level * 5;
-			clients[c_id]->_max_exp = clients[c_id]->_level * 100; ;
-
-		}
-
-		cout << clients[c_id]->_x << "   " << clients[c_id]->_y << endl;
-#endif
 		{
 			lock_guard<mutex> ll(clients[c_id]->_s_lock);
 			clients[c_id]->_state = ST_INGAME;
@@ -330,10 +337,15 @@ void process_packet(int c_id, char* packet)
 		exover->_comp_type = OP_PLAYER_HPUP;
 		PostQueuedCompletionStatus(h_iocp, 1, c_id, &exover->_over);
 
-
 		/*TIMER_EVENT ev{ c_id, chrono::system_clock::now() + 5s, EV_RANDOM_MOVE, 0 };
 		timer_queue.push(ev);*/
 
+		break;
+	}
+	case CS_TELEPORT:
+	{
+		clients[c_id]->_x = rand() % W_WIDTH;
+		clients[c_id]->_y = rand() % W_HEIGHT;
 		break;
 	}
 	case CS_LOGOUT:
@@ -372,7 +384,7 @@ void process_packet(int c_id, char* packet)
 
 		}
 
-		clients[c_id]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
+		clients[c_id]->send_move_packet(c_id, clients[c_id]);
 
 		//다른애들한테 내 정보 전달 
 		for (auto& near_pl : near_list) {
@@ -381,7 +393,7 @@ void process_packet(int c_id, char* packet)
 				cpl->_vl.lock();
 				if (clients[near_pl]->_view_list.count(c_id)) {
 					cpl->_vl.unlock();
-					clients[near_pl]->send_move_packet(c_id, clients[c_id], clients[c_id]->last_movetime);
+					clients[near_pl]->send_move_packet(c_id, clients[c_id]);
 				}
 				else
 				{
@@ -399,7 +411,9 @@ void process_packet(int c_id, char* packet)
 		for (auto& index : old_vlist) {
 			if (0 == near_list.count(index)) {
 				clients[c_id]->send_remove_session_packet(index);
-				clients[index]->send_remove_session_packet(c_id);
+				if (index < MAX_USER)
+					clients[index]->send_remove_session_packet(c_id);
+				else break;
 			}
 
 		}
@@ -420,7 +434,6 @@ void process_packet(int c_id, char* packet)
 		clients[c_id]->_vl.lock();
 		unordered_set<int> old_vlist = clients[c_id]->_view_list;
 		clients[c_id]->_vl.unlock();
-		cout << "p->attack_type = " << p->attack_type << endl;
 		//npc 뷰리스트에서 공격체크 
 		for (auto& near_pl : old_vlist) {
 			auto& cpl = clients[near_pl];
@@ -623,12 +636,12 @@ void worker_thread(HANDLE h_iocp) {
 		case OP_AI_NEAR_CHECK: {
 			clients[key]->_ll.lock();
 			auto L = clients[key]->_L;
-			lua_getglobal(L, "event_player_move"); //여기서 버그 터짐
+			lua_getglobal(L, "event_player_move");
 			lua_pushnumber(L, ex_over->_ai_target_obj);
 			lua_pcall(L, 1, 1, 0);
 			//여기서 근처에 있는지 체크 1이면 영역 안에 들어옴
 			bool check = (int)lua_tointeger(L, -1);
-			lua_pop(L, 2);
+			lua_pop(L, 1);
 			clients[key]->_ll.unlock();
 			if (check == 1) {
 				reinterpret_cast<Monster*>(clients[key])->_current_state = CST_CHASE;
@@ -673,7 +686,7 @@ void worker_thread(HANDLE h_iocp) {
 				clients[key]->_hp = clients[key]->_level * 100;
 
 			reinterpret_cast<Player*>(clients[key])->send_stat_changel_packet();
-			//시야에 들어오는 플레이어에게 보여주기 
+		
 			TIMER_EVENT ev{ key, chrono::system_clock::now() + 5s, EV_HPUP, 0 };
 			timer_queue.push(ev);
 
@@ -853,7 +866,7 @@ int API_MonsterHit(lua_State* L)
 
 int API_attack(lua_State* L)
 {
-	cout << "몬스터 공격" << endl;
+	//cout << "몬스터 공격" << endl;
 	int monster_id = (int)lua_tointeger(L, -2);
 	int plyaer_id = (int)lua_tointeger(L, -1);
 
@@ -884,7 +897,7 @@ int API_attack(lua_State* L)
 
 		}
 
-		clients[plyaer_id]->send_move_packet(plyaer_id, clients[plyaer_id], clients[plyaer_id]->last_movetime);
+		clients[plyaer_id]->send_move_packet(plyaer_id, clients[plyaer_id]);
 
 		//다른애들한테 내 정보 전달 
 		for (auto& near_pl : near_list) {
@@ -893,7 +906,7 @@ int API_attack(lua_State* L)
 				cpl->_vl.lock();
 				if (clients[near_pl]->_view_list.count(plyaer_id)) {
 					cpl->_vl.unlock();
-					clients[near_pl]->send_move_packet(plyaer_id, clients[plyaer_id], clients[plyaer_id]->last_movetime);
+					clients[near_pl]->send_move_packet(plyaer_id, clients[plyaer_id]);
 				}
 				else
 				{
@@ -935,7 +948,7 @@ void InitializeNPC()
 
 		auto L = clients[i]->_L = luaL_newstate();
 		luaL_openlibs(L);
-		if (rand() % 2 == 0) { //파란달팽이
+		if (rand()%2 ==0) { //파란달팽이
 			luaL_loadfile(L, "monster.lua");
 			lua_pcall(L, 0, 0, 0);
 

@@ -33,7 +33,7 @@ constexpr char SC_LOGIN_FAIL = 8;
 constexpr char SC_STAT_CHANGE = 9;
 constexpr char SC_OBSTACLE = 10;
 constexpr char SC_PLAYERATTACK = 11;
-constexpr char SC_MONSTERHP = 13;
+constexpr char SC_MONSTERHP = 12;
 #pragma pack (push, 1)
 
 struct CS_LOGIN_PACKET {

@@ -11,7 +11,7 @@ void Monster::do_send(void* packet)
 	WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
 }
 
-void Monster::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
+void Monster::send_move_packet(int c_id, SESSION* clients)
 {
 	SC_MOVE_OBJECT_PACKET p;
 	p.id = c_id;
@@ -20,7 +20,7 @@ void Monster::send_move_packet(int c_id, SESSION* clients, unsigned move_time)
 	p.x = clients->_x;
 	p.y = clients->_y;
 	p.dir = clients->_dir;
-	p.move_time = move_time;
+	p.move_time = last_movetime;
 	do_send(&p);
 }
 
@@ -143,7 +143,6 @@ void Monster::chase_move(SESSION* client,const array<Obstacle,MAX_OBSTACLE>* obs
 	//	break;
 	//} 
 	//q_root.pop();
-	cout << "move_start" << endl;
 	if (up_chance == true) {
 		_y--;
 		up_chance = false;
@@ -193,7 +192,6 @@ void Monster::chase_move(SESSION* client,const array<Obstacle,MAX_OBSTACLE>* obs
 			}
 		}
 	}
-	cout << "move_end" << endl;
 }
 
 

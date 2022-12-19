@@ -10,10 +10,12 @@ private:
     SQLRETURN retcode; // 리턴코드를 저장할 변수 
 
 public:
+    mutex db_l;
     DB();
     ~DB();
     void show_error(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode);
     bool update_db(char* name, short& xPos, short& yPos, short& level, int& hp, int& exp);
-    bool check_id(char* name, short& xPos, short& yPos, short& level, int& hp, int& exp);
+    bool load_info(char* name, short& xPos, short& yPos, short& level, int& hp, int& exp);
     bool add_user(char* name);
+    bool exist_id(char* name, int* is_exist);
 };
