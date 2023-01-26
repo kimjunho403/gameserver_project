@@ -1034,18 +1034,30 @@ void InitializeNPC()
 void do_timer()
 {
 
+	priority_queue<TIMER_EVENT> q;
+
+	//queue<TIMER_EVENT> q;
+	
 	while (true) {
 		TIMER_EVENT ev;
+		while (timer_queue.try_pop(ev) == true)
+		{
+			q.push(ev);
+		
+		}
+
 		auto current_time = chrono::system_clock::now();
 		
-		if (true == timer_queue.try_pop(ev)) {
-			if (ev.wakeup_time > current_time) {//아직 실행시간이 안됐다면
-				timer_queue.push(ev);		// 최적화 필요
+		if (!q.empty()) {
+			if (q.top().wakeup_time > current_time) {//아직 실행시간이 안됐다면
+				TIMER_EVENT temp = q.top();
+				q.pop();
+				q.push(temp);		// 최적화 필요
 				// timer_queue에 다시 넣지 않고 처리해야 한다.
 				this_thread::sleep_for(1ms);  // 실행시간이 아직 안되었으므로 잠시 대기
 				continue;
 			}
-			switch (ev.event_id) {
+			switch (q.top().event_id) {
 			case EV_RANDOM_MOVE:
 			{
 				OVER_EXP* ov = new OVER_EXP;
@@ -1088,9 +1100,10 @@ void do_timer()
 				break;
 			}
 			}
+			q.pop();
 			continue;		// 즉시 다음 작업 꺼내기
 		}
-		this_thread::sleep_for(1ms);   // timer_queue가 비어 있으니 잠시 기다렸다가 다시 시작
+		//this_thread::sleep_for(1ms);   // timer_queue가 비어 있으니 잠시 기다렸다가 다시 시작
 	}
 }
 
