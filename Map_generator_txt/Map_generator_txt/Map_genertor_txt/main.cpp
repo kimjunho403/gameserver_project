@@ -3,7 +3,7 @@
 #include <array>
 
 using namespace std;
-
+ constexpr int MAX_OBSTACLE = 10000;
 //struct Obstacle
 //{
 //	static const int MAX_OBSTACLE = 10000;
@@ -24,7 +24,7 @@ int main()
 		int i = 0;
 		for (int x = 500; x < 1500; x++) {
 			for (int y = 500; y < 1500; y++) {
-				if (rand() % 50 == 1 && i <= Obstacle::MAX_OBSTACLE) {
+				if (rand() % 50 == 1 && i <= MAX_OBSTACLE) {
 					os << "ID " << i << "\n";
 					os << "x " << x << "\n";
 					os << "y " << y << "\n";

@@ -1,10 +1,12 @@
 #include "global.h"
+#include "fstream"
 #include "Over_exp.h"
 #include "Session.h"
 #include "Player.h"
 #include "monster.h"
 #include "Obstacle.h"
 #include "DB.h"
+
 #include <random>
 
 enum EVENT_TYPE { EV_RANDOM_MOVE, EV_RESPAWN, EV_HPUP, EV_CHASE, EV_BUFF_END };
@@ -36,17 +38,28 @@ DB User_DB;
 
 void init_obstacle() {
 	cout << "obstacle init" << endl;
+
+	ifstream is("map.bin", ios::binary);
 	int i = 0;
-	for (int x = 500; x < 1500; x++) {
-		for (int y = 500; y < 1500; y++) {
-			if (rand() % 50 == 1 && i <= MAX_OBSTACLE) {
-				obsatcles[i]._id = i;
-				obsatcles[i]._x = x;
-				obsatcles[i]._y = y;
-				i++;
+	string ignore;
+	if (is) {
+		for (int x = 500; x < 1500; x++) {
+			for (int y = 500; y < 1500; y++) {
+				if (rand() % 50 == 1 && i <= MAX_OBSTACLE) {
+					is >> ignore >> obsatcles[i]._id;
+					is >> ignore >> obsatcles[i]._x;
+					is >> ignore >> obsatcles[i]._y;
+					i++;
+				}
 			}
 		}
 	}
+	else {
+		cout << "cant file open" << endl;
+	}
+	is.close();
+
+
 	cout << "obstacle init end" << endl;
 
 }
@@ -1034,30 +1047,18 @@ void InitializeNPC()
 void do_timer()
 {
 
-	priority_queue<TIMER_EVENT> q;
-
-	//queue<TIMER_EVENT> q;
-	
 	while (true) {
 		TIMER_EVENT ev;
-		while (timer_queue.try_pop(ev) == true)
-		{
-			q.push(ev);
-		
-		}
-
 		auto current_time = chrono::system_clock::now();
 		
-		if (!q.empty()) {
-			if (q.top().wakeup_time > current_time) {//아직 실행시간이 안됐다면
-				TIMER_EVENT temp = q.top();
-				q.pop();
-				q.push(temp);		// 최적화 필요
+		if (true == timer_queue.try_pop(ev)) {
+			if (ev.wakeup_time > current_time) {//아직 실행시간이 안됐다면
+				timer_queue.push(ev);		// 최적화 필요
 				// timer_queue에 다시 넣지 않고 처리해야 한다.
 				this_thread::sleep_for(1ms);  // 실행시간이 아직 안되었으므로 잠시 대기
 				continue;
 			}
-			switch (q.top().event_id) {
+			switch (ev.event_id) {
 			case EV_RANDOM_MOVE:
 			{
 				OVER_EXP* ov = new OVER_EXP;
@@ -1100,10 +1101,9 @@ void do_timer()
 				break;
 			}
 			}
-			q.pop();
 			continue;		// 즉시 다음 작업 꺼내기
 		}
-		//this_thread::sleep_for(1ms);   // timer_queue가 비어 있으니 잠시 기다렸다가 다시 시작
+		this_thread::sleep_for(1ms);   // timer_queue가 비어 있으니 잠시 기다렸다가 다시 시작
 	}
 }
 
